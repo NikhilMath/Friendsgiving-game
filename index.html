@@ -199,7 +199,7 @@ function title(size) {
 const Host = {
   active: false, peer: null, code: null, ready: false,
   players: new Map(), phase: 'lobby',
-  settings: Object.assign({ per: 2, secs: 20, custom: '' }, store.get('ton-settings') || {}),
+  settings: Object.assign({ per: 2, secs: 20 }, store.get('ton-settings') || {}),
   rounds: [], ri: -1, roundStart: 0, dur: 20000, guesses: new Map(), timer: null, last: null,
 
   start() {
@@ -285,7 +285,7 @@ const Host = {
 
     if (msg.t === 'swap' && this.phase === 'write' && !p.answers && !p.swapped) {
       const i = msg.i | 0;
-      const fresh = this.promptPool().filter(x => !p.prompts.includes(x));
+      const fresh = DEFAULT_PROMPTS.filter(x => !p.prompts.includes(x));
       if (i < 0 || i >= p.prompts.length || !fresh.length) return;
       p.prompts[i] = shuffle(fresh)[0];
       p.swapped = true;
@@ -315,10 +315,9 @@ const Host = {
 
   /* ---- phases ---- */
   readSettings() {
-    const per = document.getElementById('set-per'), secs = document.getElementById('set-secs'), custom = document.getElementById('set-custom');
+    const per = document.getElementById('set-per'), secs = document.getElementById('set-secs');
     if (per) this.settings.per = +per.value;
     if (secs) this.settings.secs = +secs.value;
-    if (custom) this.settings.custom = custom.value;
     store.set('ton-settings', this.settings);
     const est = document.getElementById('est'); if (est) est.textContent = this.estimate();
   },
@@ -332,13 +331,8 @@ const Host = {
     return `⏱️ ${lead}about ${mins} min · ${rounds} rounds`;
   },
 
-  promptPool() {
-    const custom = this.settings.custom.split('\n').map(s => s.trim()).filter(Boolean);
-    return custom.length >= this.settings.per ? custom : DEFAULT_PROMPTS;
-  },
-
   assignPrompts(p) {
-    p.prompts = shuffle(this.promptPool()).slice(0, this.settings.per);
+    p.prompts = shuffle(DEFAULT_PROMPTS).slice(0, this.settings.per);
     p.answers = null;
     p.swapped = false;
   },
@@ -472,7 +466,7 @@ const Host = {
     const base = { name: p.name, score: p.score };
     let v;
     if (this.phase === 'lobby') v = { phase: 'lobby', count: this.players.size };
-    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers, canSwap: !p.swapped && this.promptPool().length > p.prompts.length };
+    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers, canSwap: !p.swapped && DEFAULT_PROMPTS.length > p.prompts.length };
     else if (this.phase === 'guess') {
       const r = this.rounds[this.ri];
       const g = this.guesses.get(p.id);
@@ -542,8 +536,6 @@ const Host = {
               <select id="set-per">${[1,2,3].map(v => `<option ${v === s.per ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
             <div><label for="set-secs">Seconds to guess</label>
               <select id="set-secs">${[15,20,30].map(v => `<option ${v === s.secs ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-            <div class="full"><label for="set-custom">Your own prompts (optional, one per line)</label>
-              <textarea id="set-custom" rows="4" placeholder="Leave blank to use the built-in Friendsgiving prompts">${esc(s.custom)}</textarea></div>
           </div>
         </details>
         <button class="btn big" id="go" ${n < 3 ? 'disabled' : ''}>Start game</button>
@@ -551,7 +543,7 @@ const Host = {
     try { if (window.QRCode) new QRCode(document.getElementById('qr'), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
     document.getElementById('go').onclick = () => this.startWriting();
     document.getElementById('chips').onclick = e => { const b = e.target.closest('[data-kick]'); if (b) this.kick(b.dataset.kick); };
-    ['set-per', 'set-secs', 'set-custom'].forEach(id => document.getElementById(id).addEventListener('change', () => this.readSettings()));
+    ['set-per', 'set-secs'].forEach(id => document.getElementById(id).addEventListener('change', () => this.readSettings()));
   },
 
   vWrite() {
@@ -864,13 +856,13 @@ function home() {
         <li><b>The host screen is the game.</b> There's no server: phones connect straight to the host's browser. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
         <li><b>Phones don't need the same Wi-Fi.</b> Mobile data works too.</li>
         <li><b>Dropped out?</b> Rejoin with the same name to keep your score.</li>
-        <li><b>Game settings</b> on the host screen let you pick answers per player, seconds to guess, and your own prompts.</li>
+        <li><b>Game settings</b> on the host screen let you pick answers per player and seconds to guess.</li>
         <li>You need at least 3 players (not counting the host screen).</li>
       </ul>
     </details>
     <section class="prompts">
       <h3>The prompts</h3>
-      <p class="sub small">Each player gets a few of these at random, unless the host adds their own.</p>
+      <p class="sub small">Each player gets a few of these at random.</p>
       <ul>${DEFAULT_PROMPTS.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
     </section>
   </div>

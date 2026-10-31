@@ -13,7 +13,7 @@ A Kahoot-style Friendsgiving party game. Everyone secretly answers prompts on th
 2. Friends scan the QR code (or open the site and enter the 4-letter code).
 3. Press **Start game** once 3+ people are in. Space/Enter advances screens on the host.
 
-Settings in the lobby: answers per player (1–3), seconds per guess, and your own custom prompts.
+Settings in the lobby: answers per player (1–3) and seconds per guess.
 
 ## Deploy
 
