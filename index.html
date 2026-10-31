@@ -110,6 +110,17 @@ button.chip:hover{border-color:var(--bad)}
 .p3 .blk{height:clamp(70px,11vh,120px);background:#d08a4f}
 @keyframes rise{from{transform:scaleY(0);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
 
+/* home: how to play + footer */
+.howto{width:100%;max-width:560px;text-align:left;background:var(--card);border-radius:16px;padding:6px 18px}
+.howto summary{cursor:pointer;font-weight:600;font-size:1.15rem;padding:10px 0;text-align:center}
+.howto h3{color:var(--gold);font-size:1.05rem;font-weight:600;margin:14px 0 6px}
+.howto ol,.howto ul{padding-left:22px;color:var(--muted);line-height:1.45;display:flex;flex-direction:column;gap:4px}
+.howto b{color:var(--cream);font-weight:500}
+.howto>:last-child{margin-bottom:14px}
+.foot{color:var(--muted);font-size:.95rem;padding:0 16px 20px;text-align:center}
+.foot a{color:var(--pumpkin);text-decoration:none;font-weight:500}
+.foot a:hover{text-decoration:underline}
+
 .status{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;
   padding:8px 18px;border-radius:999px;font-size:1rem;font-weight:500;z-index:10;display:none}
 .status.show{display:block}
@@ -784,7 +795,36 @@ function home() {
       <button class="btn ghost big" id="join">Join on my phone</button>
     </div>
     <p class="sub small">Open the host screen on the TV or laptop. Everyone else joins on their phone.</p>
-  </div>`;
+    <details class="howto">
+      <summary>How to play</summary>
+      <h3>Setup</h3>
+      <ol>
+        <li>On a TV or laptop everyone can see, tap <b>Host on this screen</b>.</li>
+        <li>Everyone else scans the QR code with their phone, or opens this site and enters the 4-letter room code.</li>
+        <li>Once everyone's in, the host starts the game. Space, Enter or → also advances it.</li>
+      </ol>
+      <h3>Playing</h3>
+      <ol>
+        <li><b>Write:</b> each phone gets secret prompts. Answer them without letting anyone see.</li>
+        <li><b>Guess:</b> answers show up on the big screen one at a time. Pick who you think wrote it on your phone.</li>
+        <li><b>Reveal:</b> the author is revealed and points are added. Highest score at the end wins.</li>
+      </ol>
+      <h3>Scoring</h3>
+      <ul>
+        <li><b>Right guess:</b> 500–1,000 points. The faster you answer, the more you get.</li>
+        <li><b>Fooling people:</b> 150 points for each player who guesses wrong on your answer.</li>
+      </ul>
+      <h3>Good to know</h3>
+      <ul>
+        <li><b>The host screen is the game.</b> There's no server: phones connect straight to the host's browser. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
+        <li><b>Phones don't need the same Wi-Fi.</b> Mobile data works too.</li>
+        <li><b>Dropped out?</b> Rejoin with the same name to keep your score.</li>
+        <li><b>Game settings</b> on the host screen let you pick answers per player, seconds to guess, and your own prompts.</li>
+        <li>You need at least 3 players (not counting the host screen).</li>
+      </ul>
+    </details>
+  </div>
+  <footer class="foot">Made by <a href="https://nikhilmath.com" target="_blank" rel="noopener">NikhilMath.com</a></footer>`;
   document.getElementById('host').onclick = () => {
     if (!window.Peer) { setStatus("Couldn't load the game engine — check your internet."); return; }
     Host.start();
