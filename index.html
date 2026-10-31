@@ -309,6 +309,16 @@ const Host = {
     if (secs) this.settings.secs = +secs.value;
     if (custom) this.settings.custom = custom.value;
     store.set('ton-settings', this.settings);
+    const est = document.getElementById('est'); if (est) est.textContent = this.estimate();
+  },
+
+  // rough game length: writing time, then each round's guessing (often ends early) plus the reveal
+  estimate() {
+    const n = Math.max(this.players.size, 3), { per, secs } = this.settings;
+    const rounds = n * per;
+    const mins = Math.max(1, Math.round((30 + per * 45 + rounds * (secs * 0.75 + 15) + 30) / 60));
+    const lead = this.players.size < 3 ? 'With 3 players: ' : '';
+    return `⏱️ ${lead}about ${mins} min · ${rounds} rounds`;
   },
 
   promptPool() {
@@ -493,6 +503,7 @@ const Host = {
       document.getElementById('chips').innerHTML = this.chips('lobby');
       document.getElementById('count').textContent = countText;
       document.getElementById('go').disabled = n < 3;
+      document.getElementById('est').textContent = this.estimate();
       return;
     }
     const url = location.origin + location.pathname + '?room=' + this.code;
@@ -510,8 +521,10 @@ const Host = {
         <p class="sub">Write secret answers on your phone. Then guess who wrote what.<br>Fast right guesses score big. Fooling everyone scores too.</p>
         <div class="sub" id="count">${countText}</div>
         <div class="chips" id="chips">${this.chips('lobby')}</div>
+        <div class="sub small" id="est">${this.estimate()}</div>
         <details class="settings">
           <summary>Game settings</summary>
+          <p class="sub small" style="margin-top:6px">Game length changes with these and the number of players. The estimate above updates as you go.</p>
           <div class="grid">
             <div><label for="set-per">Answers per player</label>
               <select id="set-per">${[1,2,3].map(v => `<option ${v === s.per ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
