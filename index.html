@@ -323,13 +323,14 @@ const Host = {
     const est = document.getElementById('est'); if (est) est.textContent = this.estimate();
   },
 
-  // rough game length: writing time, then each round's guessing (often ends early) plus the reveal
+  // rough game length for the players in the lobby (3 minimum): writing time, then each round's guess timer plus the reveal
   estimate() {
     const n = Math.max(this.players.size, 3), { per, secs } = this.settings;
     const rounds = n * per;
-    const mins = Math.max(1, Math.round((30 + per * 45 + rounds * (secs * 0.75 + 15) + 30) / 60));
-    const lead = this.players.size < 3 ? 'With 3 players: ' : '';
-    return `⏱️ ${lead}about ${mins} min · ${rounds} rounds`;
+    const half = Math.max(2, Math.round((30 + per * 45 + rounds * (secs + 15) + 30) / 30));
+    const mins = (half >> 1) + (half % 2 ? '½' : '');
+    const lead = this.players.size < 3 ? 'With 3 players (the minimum)' : `With ${n} players`;
+    return `⏱️ ${lead}: about ${mins} min · ${rounds} rounds`;
   },
 
   assignPrompts(p) {
@@ -544,7 +545,7 @@ const Host = {
     try { if (window.QRCode) new QRCode(document.getElementById('qr'), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
     document.getElementById('go').onclick = () => this.startWriting();
     document.getElementById('chips').onclick = e => { const b = e.target.closest('[data-kick]'); if (b) this.kick(b.dataset.kick); };
-    ['set-per', 'set-secs'].forEach(id => document.getElementById(id).addEventListener('change', () => this.readSettings()));
+    ['set-per', 'set-secs'].forEach(id => ['change', 'input'].forEach(ev => document.getElementById(id).addEventListener(ev, () => this.readSettings())));
   },
 
   vWrite() {
