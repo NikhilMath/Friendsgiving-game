@@ -826,6 +826,9 @@ function home() {
         <li><b>Right guess:</b> 500–1,000 points. The faster you answer, the more you get.</li>
         <li><b>Fooling people:</b> 150 points for each player who guesses wrong on your answer.</li>
       </ul>
+      <h3>The prompts</h3>
+      <p class="small" style="color:var(--muted);margin-bottom:6px">Each player gets a few of these at random (unless the host adds their own):</p>
+      <ul>${DEFAULT_PROMPTS.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
       <h3>Good to know</h3>
       <ul>
         <li><b>The host screen is the game.</b> There's no server: phones connect straight to the host's browser. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
