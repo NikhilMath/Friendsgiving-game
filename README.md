@@ -1,4 +1,4 @@
-# Thankful… or Not? 🦃
+# Who Wrote That? 🦃
 
 A Kahoot-style Friendsgiving party game. Everyone secretly answers prompts on their phone, then the group guesses who wrote each answer.
 
