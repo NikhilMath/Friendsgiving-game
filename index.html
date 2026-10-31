@@ -877,7 +877,7 @@ function home() {
       <ul>${DEFAULT_PROMPTS.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
     </section>
   </div>
-  <footer class="foot">Made by <a href="https://nikhilmath.com" target="_blank" rel="noopener">NikhilMath.com</a></footer>`;
+  <footer class="foot">Vibe coded by <a href="https://nikhilmath.com" target="_blank" rel="noopener">NikhilMath.com</a></footer>`;
   document.getElementById('host').onclick = () => {
     if (!window.Peer) { setStatus("Couldn't load the game engine — check your internet."); return; }
     Host.start();
