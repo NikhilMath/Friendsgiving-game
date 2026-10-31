@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Thankful… or Not?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#24140d;--bg2:#3a2014;--card:#43271a;--line:#5e3a26;
+  --cream:#fff3e0;--muted:#d9b99b;--pumpkin:#f28c28;--gold:#f6c453;
+  --good:#5cc27a;--bad:#ef6a55;
+  --c0:#e2523f;--c1:#3b7dd8;--c2:#d99510;--c3:#3a9d55;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{font-family:'Fredoka',system-ui,-apple-system,sans-serif;background:var(--bg);
+  background-image:radial-gradient(ellipse at top,#53301c 0%,rgba(36,20,13,0) 65%);
+  background-attachment:fixed;color:var(--cream);-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent}
+#app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 16px 40px;gap:20px;text-align:center}
+h1{font-size:clamp(2.4rem,6vw,5rem);font-weight:700;line-height:1;letter-spacing:-.01em}
+h1 .alt{color:var(--pumpkin)}
+h2{font-size:clamp(1.6rem,4vw,2.6rem);font-weight:600;line-height:1.15}
+.sub{color:var(--muted);font-size:clamp(1rem,2vw,1.35rem);line-height:1.35}
+.small{font-size:.95rem}
+.emoji{font-size:clamp(3rem,8vw,5rem);line-height:1}
+.btn{font:inherit;font-weight:600;font-size:1.15rem;border:0;border-radius:14px;padding:14px 26px;
+  cursor:pointer;background:var(--pumpkin);color:#2a1408;box-shadow:0 5px 0 #a8561a;
+  transition:transform .08s,box-shadow .08s}
+.btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 2px 0 #a8561a}
+.btn.ghost{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 2px var(--line)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.big{font-size:1.45rem;padding:18px 36px}
+input,textarea,select{font:inherit;color:var(--cream);background:var(--bg2);border:2px solid var(--line);
+  border-radius:12px;padding:12px 14px;width:100%;font-size:1.1rem}
+textarea{resize:vertical;min-height:84px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--pumpkin)}
+label{display:block;text-align:left;font-weight:500;margin-bottom:6px}
+.card{background:var(--card);border-radius:20px;padding:22px;box-shadow:0 6px 0 rgba(0,0,0,.25)}
+.stack{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px}
+.err{color:var(--bad);font-weight:500}
+.topbar{display:flex;justify-content:space-between;gap:12px;padding:14px 18px 0;color:var(--muted);
+  font-size:clamp(1rem,1.8vw,1.3rem);font-weight:500}
+
+/* lobby */
+.lobby{display:grid;grid-template-columns:minmax(280px,1fr) 1.6fr;gap:32px;width:100%;max-width:1200px;align-items:center}
+@media (max-width:820px){.lobby{grid-template-columns:1fr}}
+.joinbox{display:flex;flex-direction:column;align-items:center;gap:12px}
+.url{font-size:1.15rem;font-weight:500;word-break:break-all}
+.code{font-size:clamp(3.2rem,9vw,6.5rem);font-weight:700;letter-spacing:.12em;color:var(--gold);line-height:1}
+#qr{background:#fff;padding:12px;border-radius:14px;display:inline-block;line-height:0}
+#qr img,#qr canvas{display:block;width:200px;height:200px}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:48px}
+.chip{font:inherit;color:var(--cream);background:var(--bg2);border:2px solid var(--line);border-radius:999px;
+  padding:8px 18px;font-size:1.25rem;font-weight:500;animation:pop .35s ease-out}
+button.chip{cursor:pointer}
+button.chip:hover{border-color:var(--bad)}
+.chip.off{opacity:.45}
+.chip.done{border-color:var(--good)}
+.settings{width:100%;text-align:left}
+.settings summary{cursor:pointer;color:var(--muted);font-size:1.05rem;padding:6px 0}
+.settings .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.settings .full{grid-column:1/-1}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+
+/* guessing */
+.prompt-label{color:var(--gold);font-size:clamp(1.1rem,2.4vw,1.9rem);font-weight:500}
+.answer{font-size:clamp(1.8rem,4.6vw,3.8rem);font-weight:600;line-height:1.2;max-width:1100px;width:100%;
+  overflow-wrap:anywhere;animation:pop .4s ease-out}
+.tnum{font-size:clamp(2.6rem,5vw,4rem);font-weight:700;line-height:1}
+.timer{width:min(900px,92%);height:16px;background:var(--bg2);border-radius:999px;overflow:hidden}
+.timer i{display:block;height:100%;background:var(--pumpkin);transition:width .25s linear}
+
+/* phone choices */
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:520px}
+.choice{font:inherit;font-weight:600;font-size:1.2rem;color:#fff;border:0;border-radius:14px;padding:16px 10px;
+  min-height:80px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.3);display:flex;align-items:center;
+  justify-content:center;gap:8px;overflow-wrap:anywhere}
+.choice:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.choice .shape{opacity:.75;font-size:.85em}
+.k0{background:var(--c0)}.k1{background:var(--c1)}.k2{background:var(--c2)}.k3{background:var(--c3)}
+.quote{font-size:1.25rem;font-weight:500;line-height:1.3;overflow-wrap:anywhere}
+
+/* reveal + board */
+.reveal-name{font-size:clamp(3rem,9vw,7rem);font-weight:700;color:var(--gold);line-height:1;animation:pop .5s ease-out}
+.board{width:100%;max-width:640px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);
+  border-radius:12px;padding:10px 18px;font-size:clamp(1.05rem,2vw,1.45rem);font-weight:500}
+.row .pts{color:var(--gold);font-weight:600}
+.gain{color:var(--good);font-weight:600}
+.verdict{font-size:clamp(2.6rem,10vw,4rem);font-weight:700;line-height:1}
+.ok{color:var(--good)}.no{color:var(--bad)}
+
+/* podium */
+.podium{display:flex;align-items:flex-end;gap:14px;justify-content:center;width:100%}
+.pod{display:flex;flex-direction:column;align-items:center;gap:8px;width:clamp(100px,18vw,220px)}
+.pod .nm{font-size:clamp(1.1rem,2.4vw,1.7rem);font-weight:600;overflow-wrap:anywhere}
+.pod .sc{color:var(--muted)}
+.pod .blk{width:100%;border-radius:14px 14px 0 0;display:flex;justify-content:center;padding-top:12px;
+  font-size:2.6rem;font-weight:700;color:#2a1408;animation:rise .7s ease-out both}
+.p1 .blk{height:clamp(140px,22vh,230px);background:var(--gold);animation-delay:.6s}
+.p2 .blk{height:clamp(100px,16vh,170px);background:#dcdcdc;animation-delay:.3s}
+.p3 .blk{height:clamp(70px,11vh,120px);background:#d08a4f}
+@keyframes rise{from{transform:scaleY(0);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
+
+.status{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;
+  padding:8px 18px;border-radius:999px;font-size:1rem;font-weight:500;z-index:10;display:none}
+.status.show{display:block}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="status" id="status"></div>
+<script>
+(() => {
+'use strict';
+
+/* ---------- shared helpers ---------- */
+const $app = document.getElementById('app');
+const PREFIX = 'thankful-or-not-v1-';
+const SHAPES = ['▲', '◆', '●', '■'];
+const DEFAULT_PROMPTS = [
+  "Something I'm weirdly thankful for",
+  "My most controversial Thanksgiving food opinion",
+  "A hidden talent nobody here knows about",
+  "The most embarrassing thing I did as a kid",
+  "A food I secretly can't stand",
+  "The worst gift I've ever received",
+  "Something I'm thankful for this year",
+  "My most irrational fear",
+  "A celebrity I've been told I look like",
+  "The weirdest job I've ever had",
+  "A skill I pretend to have",
+  "My go-to karaoke song",
+  "A hill I will die on",
+  "Something on my bucket list",
+  "My worst haircut era",
+  "The pettiest thing I've ever done",
+  "My guilty-pleasure TV show",
+  "The strangest thing in my fridge right now",
+  "A person (not here) I'm grateful for",
+  "The dumbest way I've ever gotten hurt",
+  "A conspiracy theory I kind of believe",
+  "What I'd do with an extra hour every day"
+];
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n || 0).toLocaleString();
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function newCode() { const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 4; i++) s += L[Math.random() * L.length | 0]; return s; }
+function ordinal(n) { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function setStatus(msg) { const el = document.getElementById('status'); if (!el) return; el.textContent = msg || ''; el.classList.toggle('show', !!msg); }
+
+let wakeLock = null;
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+
+function title(size) {
+  return `<h1${size ? ` style="font-size:${size}"` : ''}>Thankful<span class="alt">… or Not?</span></h1>`;
+}
+
+/* ---------- HOST (TV) ---------- */
+const Host = {
+  active: false, peer: null, code: null, ready: false,
+  players: new Map(), phase: 'lobby',
+  settings: Object.assign({ per: 2, secs: 20, custom: '' }, store.get('ton-settings') || {}),
+  rounds: [], ri: -1, roundStart: 0, dur: 20000, guesses: new Map(), timer: null, last: null,
+
+  start() {
+    this.active = true;
+    this.code = newCode();
+    keepAwake();
+    window.addEventListener('beforeunload', e => { if (this.players.size) { e.preventDefault(); e.returnValue = ''; } });
+    this.connect();
+  },
+
+  connect() {
+    this.ready = false;
+    this.render();
+    const peer = new Peer(PREFIX + this.code, { debug: 1 });
+    this.peer = peer;
+    peer.on('open', () => { this.ready = true; setStatus(null); this.render(true); });
+    peer.on('connection', conn => this.onConn(conn));
+    peer.on('disconnected', () => { if (!peer.destroyed) { setStatus('Reconnecting to game server…'); setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); } });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); this.code = newCode(); this.connect(); }
+      else if (err.type === 'peer-unavailable') { /* ignore */ }
+      else { console.warn(err); setStatus('Connection hiccup — retrying…'); }
+    });
+  },
+
+  list() { return [...this.players.values()]; },
+  online(p) { return !!(p.conn && p.conn.open); },
+  ranked() { return this.list().sort((a, b) => b.score - a.score); },
+  rankOf(p) { const r = this.ranked(); return r.findIndex(x => x.score === p.score) + 1; },
+
+  onConn(conn) {
+    conn.on('data', msg => this.onMsg(conn, msg));
+    conn.on('close', () => this.onClose(conn));
+    conn.on('error', () => this.onClose(conn));
+  },
+
+  onClose(conn) {
+    const p = this.players.get(conn._pid);
+    if (p && p.conn === conn) {
+      p.conn = null;
+      this.render();
+      if (this.phase === 'guess') { this.updateGuessCount(); this.checkAllGuessed(); }
+      if (this.phase === 'write' && this.everyoneWrote()) this.autoBegin();
+    }
+  },
+
+  send(p, msg) { try { if (this.online(p)) p.conn.send(msg); } catch (e) {} },
+  sendAll() { for (const p of this.players.values()) this.sendView(p); },
+
+  onMsg(conn, msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.t === 'join') {
+      const name = String(msg.name || '').replace(/\s+/g, ' ').trim().slice(0, 16);
+      if (!name) return;
+      let p = this.list().find(x => x.name.toLowerCase() === name.toLowerCase());
+      if (p && this.online(p) && p.conn !== conn) {
+        try { conn.send({ t: 'err', msg: 'That name is already taken — pick another.' }); } catch (e) {}
+        return;
+      }
+      if (!p) {
+        p = { id: Math.random().toString(36).slice(2, 10), name, score: 0, conn, prompts: [], answers: null };
+        this.players.set(p.id, p);
+        if (this.phase === 'write') this.assignPrompts(p);
+      } else {
+        p.conn = conn;
+      }
+      conn._pid = p.id;
+      this.render();
+      if (this.phase === 'lobby') this.sendAll(); else this.sendView(p);
+      if (this.phase === 'guess') this.updateGuessCount();
+      return;
+    }
+    const p = this.players.get(conn._pid);
+    if (!p || p.conn !== conn) return;
+
+    if (msg.t === 'answers' && this.phase === 'write' && !p.answers) {
+      const arr = Array.isArray(msg.answers) ? msg.answers : [];
+      p.answers = p.prompts.map((_, i) => String(arr[i] || '').trim().slice(0, 140));
+      this.render();
+      this.sendView(p);
+      if (this.everyoneWrote()) this.autoBegin();
+    }
+
+    if (msg.t === 'guess' && this.phase === 'guess') {
+      const r = this.rounds[this.ri];
+      if (!r || p.id === r.author || this.guesses.has(p.id)) return;
+      if (!this.players.has(msg.target) || msg.target === p.id) return;
+      this.guesses.set(p.id, { target: msg.target, ms: Date.now() - this.roundStart });
+      this.sendView(p);
+      this.updateGuessCount();
+      this.checkAllGuessed();
+    }
+  },
+
+  kick(id) {
+    const p = this.players.get(id);
+    if (!p || !confirm(`Remove ${p.name} from the game?`)) return;
+    this.send(p, { t: 'kicked' });
+    this.players.delete(id);
+    setTimeout(() => { try { p.conn && p.conn.close(); } catch (e) {} }, 300);
+    this.render();
+    this.sendAll();
+  },
+
+  /* ---- phases ---- */
+  readSettings() {
+    const per = document.getElementById('set-per'), secs = document.getElementById('set-secs'), custom = document.getElementById('set-custom');
+    if (per) this.settings.per = +per.value;
+    if (secs) this.settings.secs = +secs.value;
+    if (custom) this.settings.custom = custom.value;
+    store.set('ton-settings', this.settings);
+  },
+
+  promptPool() {
+    const custom = this.settings.custom.split('\n').map(s => s.trim()).filter(Boolean);
+    return custom.length >= this.settings.per ? custom : DEFAULT_PROMPTS;
+  },
+
+  assignPrompts(p) {
+    p.prompts = shuffle(this.promptPool()).slice(0, this.settings.per);
+    p.answers = null;
+  },
+
+  startWriting() {
+    if (this.players.size < 3) return;
+    this.readSettings();
+    this.phase = 'write';
+    for (const p of this.players.values()) this.assignPrompts(p);
+    this.render(true);
+    this.sendAll();
+  },
+
+  everyoneWrote() {
+    const on = this.list().filter(p => this.online(p));
+    return on.length >= 2 && on.every(p => p.answers);
+  },
+
+  autoBegin() {
+    clearTimeout(this._auto);
+    this._auto = setTimeout(() => { if (this.phase === 'write' && this.everyoneWrote()) this.beginRounds(); }, 1500);
+  },
+
+  beginRounds() {
+    if (this.phase !== 'write') return;
+    let rounds = [];
+    for (const p of this.players.values()) {
+      (p.answers || []).forEach((a, i) => { if (a) rounds.push({ author: p.id, prompt: p.prompts[i], answer: a }); });
+    }
+    if (!rounds.length) return;
+    rounds = shuffle(rounds);
+    // avoid the same author twice in a row where possible
+    for (let i = 1; i < rounds.length; i++) {
+      if (rounds[i].author === rounds[i - 1].author) {
+        const j = rounds.findIndex((r, k) => k > i && r.author !== rounds[i - 1].author && (!rounds[i + 1] || r.author !== rounds[i + 1].author));
+        if (j > -1) [rounds[i], rounds[j]] = [rounds[j], rounds[i]];
+      }
+    }
+    this.rounds = rounds;
+    this.ri = -1;
+    this.nextRound();
+  },
+
+  nextRound() {
+    clearInterval(this.timer);
+    this.ri++;
+    if (this.ri >= this.rounds.length) return this.finish();
+    this.phase = 'guess';
+    this.guesses = new Map();
+    this.dur = this.settings.secs * 1000;
+    this.roundStart = Date.now();
+    this.render(true);
+    this.sendAll();
+    this.timer = setInterval(() => this.tick(), 250);
+  },
+
+  eligible() {
+    const r = this.rounds[this.ri];
+    return this.list().filter(p => this.online(p) && p.id !== r.author);
+  },
+
+  tick() {
+    const left = Math.max(0, this.dur - (Date.now() - this.roundStart));
+    const t = document.getElementById('tnum'); if (t) t.textContent = Math.ceil(left / 1000);
+    const b = document.getElementById('tbar'); if (b) b.style.width = (left / this.dur * 100) + '%';
+    if (left <= 0) this.reveal();
+  },
+
+  updateGuessCount() {
+    const el = document.getElementById('gc');
+    if (el && this.phase === 'guess') {
+      const elig = this.eligible();
+      el.textContent = `${elig.filter(p => this.guesses.has(p.id)).length} / ${elig.length} guessed`;
+    }
+  },
+
+  checkAllGuessed() {
+    if (this.phase !== 'guess') return;
+    const elig = this.eligible();
+    if (elig.length && elig.every(p => this.guesses.has(p.id))) setTimeout(() => { if (this.phase === 'guess') this.reveal(); }, 600);
+  },
+
+  reveal() {
+    if (this.phase !== 'guess') return;
+    clearInterval(this.timer);
+    const r = this.rounds[this.ri];
+    const gains = new Map();
+    let fooled = 0;
+    const right = [];
+    for (const [pid, g] of this.guesses) {
+      const p = this.players.get(pid); if (!p) continue;
+      if (g.target === r.author) {
+        const pts = Math.round(500 + 500 * Math.max(0, 1 - g.ms / this.dur));
+        p.score += pts; gains.set(pid, pts); right.push({ name: p.name, pts });
+      } else { fooled++; gains.set(pid, 0); }
+    }
+    const author = this.players.get(r.author);
+    const authorPts = fooled * 150;
+    if (author) { author.score += authorPts; gains.set(author.id, authorPts); }
+    right.sort((a, b) => b.pts - a.pts);
+    this.last = { gains, fooled, authorPts, right, authorName: author ? author.name : 'Someone who left' };
+    this.phase = 'reveal';
+    this.render(true);
+    this.sendAll();
+  },
+
+  finish() {
+    clearInterval(this.timer);
+    this.phase = 'final';
+    this.render(true);
+    this.sendAll();
+  },
+
+  playAgain() {
+    for (const p of this.players.values()) { p.score = 0; p.answers = null; p.prompts = []; }
+    this.rounds = []; this.ri = -1; this.last = null;
+    this.phase = 'lobby';
+    this.render(true);
+    this.sendAll();
+  },
+
+  primary() {
+    if (this.phase === 'lobby') this.startWriting();
+    else if (this.phase === 'write') this.beginRounds();
+    else if (this.phase === 'guess') this.reveal();
+    else if (this.phase === 'reveal') this.nextRound();
+  },
+
+  /* ---- what each phone sees ---- */
+  sendView(p) {
+    const base = { name: p.name, score: p.score };
+    let v;
+    if (this.phase === 'lobby') v = { phase: 'lobby', count: this.players.size };
+    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers };
+    else if (this.phase === 'guess') {
+      const r = this.rounds[this.ri];
+      const g = this.guesses.get(p.id);
+      v = { phase: 'guess', n: this.ri + 1, total: this.rounds.length, prompt: r.prompt, answer: r.answer,
+            isAuthor: r.author === p.id, picked: g ? g.target : null,
+            options: this.list().filter(x => x.id !== p.id).map(x => ({ id: x.id, name: x.name })) };
+      if (g) { const t = this.players.get(g.target); v.pickedName = t ? t.name : '?'; }
+    } else if (this.phase === 'reveal') {
+      const r = this.rounds[this.ri];
+      const g = this.guesses.get(p.id);
+      v = { phase: 'reveal', isAuthor: r.author === p.id, authorName: this.last.authorName, fooled: this.last.fooled,
+            gain: this.last.gains.get(p.id) || 0, correct: g ? g.target === r.author : null, rank: this.rankOf(p) };
+    } else if (this.phase === 'final') v = { phase: 'final', rank: this.rankOf(p), total: this.players.size };
+    this.send(p, Object.assign(base, v));
+  },
+
+  /* ---- TV rendering ---- */
+  render(full) {
+    if (!this.active) return;
+    if (!this.ready && this.phase === 'lobby') {
+      $app.innerHTML = `<div class="screen">${title()}<p class="sub">Setting up the game room…</p></div>`;
+      return;
+    }
+    const fn = { lobby: this.vLobby, write: this.vWrite, guess: this.vGuess, reveal: this.vReveal, final: this.vFinal }[this.phase];
+    fn.call(this, full);
+  },
+
+  chips(kind) {
+    return this.list().map(p => {
+      const cls = ['chip', this.online(p) ? '' : 'off', kind === 'write' && p.answers ? 'done' : ''].join(' ');
+      if (kind === 'lobby') return `<button class="${cls}" data-kick="${p.id}" title="Click to remove">${esc(p.name)}</button>`;
+      return `<span class="${cls}">${kind === 'write' && p.answers ? '✓ ' : ''}${esc(p.name)}</span>`;
+    }).join('') || `<span class="sub">Waiting for players…</span>`;
+  },
+
+  vLobby(full) {
+    const n = this.players.size;
+    const countText = n < 3 ? `${n} joined — need at least 3` : `${n} players ready`;
+    if (!full && document.getElementById('lobby-root')) {
+      document.getElementById('chips').innerHTML = this.chips('lobby');
+      document.getElementById('count').textContent = countText;
+      document.getElementById('go').disabled = n < 3;
+      return;
+    }
+    const url = location.origin + location.pathname + '?room=' + this.code;
+    const s = this.settings;
+    $app.innerHTML = `<div class="screen" id="lobby-root"><div class="lobby">
+      <div class="card joinbox">
+        <div class="sub">Scan to join</div>
+        <div id="qr"></div>
+        <div class="url">${esc(url.replace(/^https?:\/\//, ''))}</div>
+        <div class="sub">Room code</div>
+        <div class="code">${this.code}</div>
+      </div>
+      <div class="stack" style="max-width:none;align-items:center">
+        ${title('clamp(2.2rem,4.5vw,3.8rem)')}
+        <p class="sub">Write secret answers on your phone. Then guess who wrote what.<br>Fast right guesses score big. Fooling everyone scores too.</p>
+        <div class="sub" id="count">${countText}</div>
+        <div class="chips" id="chips">${this.chips('lobby')}</div>
+        <details class="settings">
+          <summary>Game settings</summary>
+          <div class="grid">
+            <div><label for="set-per">Answers per player</label>
+              <select id="set-per">${[1,2,3].map(v => `<option ${v === s.per ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+            <div><label for="set-secs">Seconds to guess</label>
+              <select id="set-secs">${[15,20,30].map(v => `<option ${v === s.secs ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+            <div class="full"><label for="set-custom">Your own prompts (optional, one per line)</label>
+              <textarea id="set-custom" rows="4" placeholder="Leave blank to use the built-in Friendsgiving prompts">${esc(s.custom)}</textarea></div>
+          </div>
+        </details>
+        <button class="btn big" id="go" ${n < 3 ? 'disabled' : ''}>Start game</button>
+      </div></div></div>`;
+    try { if (window.QRCode) new QRCode(document.getElementById('qr'), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+    document.getElementById('go').onclick = () => this.startWriting();
+    document.getElementById('chips').onclick = e => { const b = e.target.closest('[data-kick]'); if (b) this.kick(b.dataset.kick); };
+    ['set-per', 'set-secs', 'set-custom'].forEach(id => document.getElementById(id).addEventListener('change', () => this.readSettings()));
+  },
+
+  vWrite() {
+    const done = this.list().filter(p => p.answers).length;
+    $app.innerHTML = `<div class="topbar"><span>Room ${this.code}</span><span>${done} / ${this.players.size} done</span></div>
+      <div class="screen">
+        <div class="emoji">✍️</div>
+        <h2>Answer your secret prompts<br>on your phone</h2>
+        <p class="sub">Be honest… or be sneaky. Nobody finds out who wrote what until the reveal.</p>
+        <div class="chips">${this.chips('write')}</div>
+        <button class="btn ghost" id="go" ${done ? '' : 'disabled'}>Start guessing now</button>
+      </div>`;
+    document.getElementById('go').onclick = () => this.beginRounds();
+  },
+
+  vGuess(full) {
+    if (!full && document.getElementById('guess-root')) { this.updateGuessCount(); return; }
+    const r = this.rounds[this.ri];
+    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span><span id="gc"></span></div>
+      <div class="screen" id="guess-root">
+        <div class="prompt-label">${esc(r.prompt)}</div>
+        <div class="card answer">“${esc(r.answer)}”</div>
+        <h2 style="font-size:clamp(1.3rem,2.6vw,2rem)">Who wrote this?</h2>
+        <div class="tnum" id="tnum">${this.settings.secs}</div>
+        <div class="timer"><i id="tbar" style="width:100%"></i></div>
+        <button class="btn ghost" id="skip">Reveal now</button>
+      </div>`;
+    this.updateGuessCount();
+    document.getElementById('skip').onclick = () => this.reveal();
+  },
+
+  vReveal() {
+    const r = this.rounds[this.ri], L = this.last;
+    const lastRound = this.ri >= this.rounds.length - 1;
+    const rightText = L.right.length
+      ? `Got it: ${L.right.map(x => `${esc(x.name)} <span class="gain">+${fmt(x.pts)}</span>`).join(', ')}`
+      : 'Nobody got it!';
+    const foolText = L.fooled ? ` · fooled ${L.fooled} <span class="gain">+${fmt(L.authorPts)}</span>` : '';
+    const top = this.ranked().slice(0, 5).map((p, i) =>
+      `<div class="row"><span>${i + 1}. ${esc(p.name)}</span><span class="pts">${fmt(p.score)}</span></div>`).join('');
+    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span><span>Room ${this.code}</span></div>
+      <div class="screen">
+        <div class="prompt-label">“${esc(r.answer)}”</div>
+        <div class="sub">was written by…</div>
+        <div class="reveal-name">${esc(L.authorName)}</div>
+        <div class="sub">${rightText}${foolText}</div>
+        <div class="board">${top}</div>
+        <button class="btn big" id="next">${lastRound ? 'Final results 🏆' : 'Next round →'}</button>
+        <div class="sub small">or press Space</div>
+      </div>`;
+    document.getElementById('next').onclick = () => this.nextRound();
+  },
+
+  vFinal() {
+    const r = this.ranked();
+    const pod = (p, place) => p ? `<div class="pod p${place}"><div class="nm">${esc(p.name)}</div><div class="sc">${fmt(p.score)} pts</div><div class="blk">${place}</div></div>` : '';
+    const rest = r.slice(3).map((p, i) => `<div class="row"><span>${i + 4}. ${esc(p.name)}</span><span class="pts">${fmt(p.score)}</span></div>`).join('');
+    $app.innerHTML = `<div class="screen">
+        <div class="emoji">🏆</div>
+        <h2>${r[0] ? esc(r[0].name) + ' wins Friendsgiving!' : 'Game over'}</h2>
+        <div class="podium">${pod(r[1], 2)}${pod(r[0], 1)}${pod(r[2], 3)}</div>
+        ${rest ? `<div class="board">${rest}</div>` : ''}
+        <button class="btn big" id="again">Play again</button>
+      </div>`;
+    document.getElementById('again').onclick = () => this.playAgain();
+  }
+};
+
+/* ---------- PLAYER (phone) ---------- */
+const Player = {
+  peer: null, conn: null, code: '', name: '', view: null, stopped: false, kicked: false,
+  retry: null, dialTimer: null, drafts: [],
+
+  start(code) {
+    const saved = store.get('ton-player') || {};
+    this.form(code || saved.code || '', saved.name || '');
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.view && !this.stopped && !(this.conn && this.conn.open)) this.open();
+    });
+  },
+
+  form(code, name, err) {
+    this.view = null;
+    $app.innerHTML = `<div class="screen">
+      <div class="emoji">🦃</div>
+      ${title('2.4rem')}
+      <form class="stack" id="jf" autocomplete="off">
+        <input id="code" placeholder="Room code" maxlength="4" autocapitalize="characters" value="${esc(code)}"
+          style="text-transform:uppercase;text-align:center;letter-spacing:.25em;font-size:1.7rem;font-weight:600">
+        <input id="name" placeholder="Your name" maxlength="16" value="${esc(name)}" style="text-align:center;font-size:1.3rem">
+        ${err ? `<div class="err">${esc(err)}</div>` : ''}
+        <button class="btn big" type="submit">Join</button>
+      </form></div>`;
+    const c = document.getElementById('code'), n = document.getElementById('name');
+    (c.value ? n : c).focus();
+    document.getElementById('jf').onsubmit = e => { e.preventDefault(); this.join(c.value, n.value); };
+  },
+
+  message(emoji, head, sub) {
+    $app.innerHTML = `<div class="screen"><div class="emoji">${emoji}</div><h2>${head}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div>`;
+  },
+
+  join(code, name) {
+    this.code = String(code).toUpperCase().replace(/[^A-Z]/g, '');
+    this.name = String(name).replace(/\s+/g, ' ').trim().slice(0, 16);
+    if (this.code.length !== 4 || !this.name) return this.form(this.code, this.name, 'Enter the 4-letter room code and your name.');
+    store.set('ton-player', { code: this.code, name: this.name });
+    this.stopped = false; this.kicked = false;
+    this.message('⏳', 'Joining…');
+    keepAwake();
+    this.open();
+  },
+
+  open() {
+    if (this.stopped) return;
+    if (!this.peer || this.peer.destroyed) {
+      const peer = new Peer({ debug: 1 });
+      this.peer = peer;
+      peer.on('open', () => this.dial());
+      peer.on('error', e => this.onErr(e));
+      peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
+    } else if (this.peer.open) {
+      this.dial();
+    } else if (this.peer.disconnected) {
+      try { this.peer.reconnect(); } catch (e) {}
+    }
+  },
+
+  dial() {
+    if (this.stopped) return;
+    try { this.conn && this.conn.close(); } catch (e) {}
+    const conn = this.peer.connect(PREFIX + this.code, { reliable: true, serialization: 'json' });
+    this.conn = conn;
+    clearTimeout(this.dialTimer);
+    this.dialTimer = setTimeout(() => {
+      if (conn.open || this.conn !== conn) return;
+      if (this.view) this.lost();
+      else { this.stop(); this.form(this.code, this.name, "Couldn't reach the game. Check the code, or try switching between Wi-Fi and cellular."); }
+    }, 15000);
+    conn.on('open', () => { clearTimeout(this.dialTimer); setStatus(null); conn.send({ t: 'join', name: this.name }); });
+    conn.on('data', m => this.onData(m));
+    conn.on('close', () => { if (this.conn === conn) this.lost(); });
+    conn.on('error', () => { if (this.conn === conn) this.lost(); });
+  },
+
+  stop() {
+    this.stopped = true;
+    clearTimeout(this.retry); clearTimeout(this.dialTimer);
+    try { this.conn && this.conn.close(); } catch (e) {}
+    try { this.peer && this.peer.destroy(); } catch (e) {}
+    this.conn = null; this.peer = null;
+  },
+
+  lost() {
+    if (this.stopped || this.kicked) return;
+    setStatus('Reconnecting…');
+    clearTimeout(this.retry);
+    this.retry = setTimeout(() => { if (!(this.conn && this.conn.open)) this.open(); }, 2000);
+  },
+
+  onErr(e) {
+    if (this.stopped) return;
+    if (this.view) { this.lost(); return; }
+    this.stop();
+    if (e.type === 'peer-unavailable') this.form(this.code, this.name, 'No game found with that code.');
+    else this.form(this.code, this.name, "Couldn't connect. Check your internet and try again.");
+  },
+
+  onData(m) {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'err') { this.stop(); this.form(this.code, '', m.msg); return; }
+    if (m.t === 'kicked') { this.kicked = true; this.stop(); this.message('👋', 'You were removed from the game'); return; }
+    if (!m.phase) return;
+    const prev = this.view;
+    this.view = m;
+    // don't wipe what someone is typing, or redraw an identical screen
+    if (prev && prev.phase === m.phase) {
+      if (m.phase === 'write' && !prev.done && !m.done) return;
+      if (m.phase === 'guess' && prev.n === m.n && prev.picked === m.picked && prev.isAuthor === m.isAuthor) return;
+    }
+    if (!prev || prev.phase !== 'write') this.drafts = [];
+    this.render();
+  },
+
+  bar() {
+    const v = this.view;
+    return `<div class="topbar"><span>${esc(v.name)}</span><span>${fmt(v.score)} pts</span></div>`;
+  },
+
+  render() {
+    const v = this.view;
+    if (v.phase === 'lobby') {
+      $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🦃</div><h2>You're in, ${esc(v.name)}!</h2>
+        <p class="sub">Look at the TV. The game starts soon.</p><p class="sub small">${v.count} player${v.count === 1 ? '' : 's'} joined</p></div>`;
+    }
+    else if (v.phase === 'write') {
+      if (v.done) {
+        $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">✅</div><h2>Locked in</h2><p class="sub">Waiting for everyone else…</p></div>`;
+        return;
+      }
+      $app.innerHTML = this.bar() + `<div class="screen"><form class="stack" id="wf">
+        <h2 style="font-size:1.6rem">Your secret prompts</h2>
+        <p class="sub small">Nobody will know it's you… until the reveal.</p>
+        ${v.prompts.map((p, i) => `<div><label for="a${i}">${esc(p)}</label>
+          <textarea id="a${i}" maxlength="140" rows="3">${esc(this.drafts[i] || '')}</textarea></div>`).join('')}
+        <div class="err" id="werr"></div>
+        <button class="btn big" type="submit">Lock in answers</button></form></div>`;
+      const f = document.getElementById('wf');
+      f.addEventListener('input', () => { this.drafts = v.prompts.map((_, i) => document.getElementById('a' + i).value); });
+      f.onsubmit = e => {
+        e.preventDefault();
+        const answers = v.prompts.map((_, i) => document.getElementById('a' + i).value.trim());
+        if (answers.some(a => !a)) { document.getElementById('werr').textContent = 'Fill in every answer first.'; return; }
+        if (!(this.conn && this.conn.open)) { document.getElementById('werr').textContent = 'Reconnecting… try again in a moment.'; return; }
+        this.conn.send({ t: 'answers', answers });
+        f.querySelector('button').disabled = true;
+      };
+    }
+    else if (v.phase === 'guess') {
+      if (v.isAuthor) {
+        $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🤫</div><h2>This one's yours!</h2>
+          <p class="sub">Keep a straight face. You score for everyone you fool.</p></div>`;
+      } else if (v.picked) {
+        $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🔒</div><h2>Locked in: ${esc(v.pickedName)}</h2>
+          <p class="sub">Waiting for the reveal…</p></div>`;
+      } else {
+        $app.innerHTML = this.bar() + `<div class="screen" style="justify-content:flex-start;gap:16px">
+          <div class="sub small">Round ${v.n} of ${v.total}</div>
+          <div class="card quote">“${esc(v.answer)}”</div>
+          <h2 style="font-size:1.5rem">Who wrote it?</h2>
+          <div class="choices">${v.options.map((o, i) =>
+            `<button class="choice k${i % 4}" data-id="${o.id}"><span class="shape">${SHAPES[i % 4]}</span>${esc(o.name)}</button>`).join('')}</div></div>`;
+        $app.querySelector('.choices').onclick = e => {
+          const b = e.target.closest('[data-id]');
+          if (!b || !(this.conn && this.conn.open)) return;
+          this.conn.send({ t: 'guess', target: b.dataset.id });
+          $app.querySelectorAll('.choice').forEach(x => { x.disabled = true; if (x !== b) x.style.opacity = .35; });
+        };
+      }
+    }
+    else if (v.phase === 'reveal') {
+      let html;
+      if (v.isAuthor) html = v.fooled
+        ? `<div class="verdict ok">😈</div><h2>You fooled ${v.fooled}!</h2><div class="verdict gain">+${fmt(v.gain)}</div>`
+        : `<div class="verdict">😅</div><h2>Nobody fell for it</h2>`;
+      else if (v.correct) html = `<div class="verdict ok">✓ Correct!</div><div class="verdict gain">+${fmt(v.gain)}</div>`;
+      else if (v.correct === false) html = `<div class="verdict no">✗ Nope</div><h2>It was ${esc(v.authorName)}</h2>`;
+      else html = `<div class="verdict no">⏰ Too slow</div><h2>It was ${esc(v.authorName)}</h2>`;
+      $app.innerHTML = this.bar() + `<div class="screen">${html}<p class="sub">You're in ${ordinal(v.rank)} place</p></div>`;
+    }
+    else if (v.phase === 'final') {
+      const medal = ['🥇', '🥈', '🥉'][v.rank - 1] || '🦃';
+      $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">${medal}</div>
+        <h2>${v.rank === 1 ? 'You won Friendsgiving!' : `You finished ${ordinal(v.rank)}`}</h2>
+        <p class="sub">${fmt(v.score)} points · ${v.total} players</p></div>`;
+    }
+  }
+};
+
+/* ---------- start ---------- */
+document.addEventListener('keydown', e => {
+  if (!Host.active) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); Host.primary(); }
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+function home() {
+  const room = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+  if (room) return Player.start(room);
+  $app.innerHTML = `<div class="screen">
+    <div class="emoji">🦃 🥧 🍂</div>
+    ${title()}
+    <p class="sub">Everyone writes secret answers. Then everyone guesses who wrote what.</p>
+    <div class="stack" style="max-width:360px">
+      <button class="btn big" id="host">Host on this screen</button>
+      <button class="btn ghost big" id="join">Join on my phone</button>
+    </div>
+    <p class="sub small">Open the host screen on the TV or laptop. Everyone else joins on their phone.</p>
+  </div>`;
+  document.getElementById('host').onclick = () => {
+    if (!window.Peer) { setStatus("Couldn't load the game engine — check your internet."); return; }
+    Host.start();
+  };
+  document.getElementById('join').onclick = () => Player.start('');
+}
+
+if (!window.Peer) setStatus("Couldn't load the game engine — check your internet and refresh.");
+window.__game = { Host, Player };
+home();
+})();
+</script>
+</body>
+</html>
