@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{
@@ -157,7 +157,7 @@ button.chip:hover{border-color:var(--bad)}
 
 /* ---------- shared helpers ---------- */
 const $app = document.getElementById('app');
-const PREFIX = 'thankful-or-not-v1-';
+const PREFIX = 'whowrotethat/v2-k7q2m9x4/';
 const SHAPES = ['▲', '◆', '●', '■'];
 const DEFAULT_PROMPTS = [
   "Something I'm weirdly thankful for",
@@ -187,6 +187,39 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 function newCode() { const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 4; i++) s += L[Math.random() * L.length | 0]; return s; }
 function ordinal(n) { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function setStatus(msg) { const el = document.getElementById('status'); if (!el) return; el.textContent = msg || ''; el.classList.toggle('show', !!msg); }
+const rid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+
+/* ---------- messaging ----------
+   Phones and the host talk through free public MQTT brokers over secure websockets, which
+   work on cellular and most Wi-Fi. Everything goes through both brokers at once, so the game
+   keeps working if either one is down; receivers drop the duplicate copy by message id. */
+const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+function Net({ subs, will, onMsg, onConnect, onStatus }) {
+  const seen = new Set(), dec = new TextDecoder();
+  const clients = BROKERS.map(url => {
+    const c = mqtt.connect(url, { will, keepalive: 20, reconnectPeriod: 2000, connectTimeout: 8000, clean: true, resubscribe: false, queueQoSZero: false });
+    c.on('connect', () => { c.subscribe(subs); onConnect && onConnect(c); onStatus && onStatus(); });
+    c.on('close', () => onStatus && onStatus());
+    c.on('error', () => {});
+    c.on('message', (topic, buf) => {
+      let m; try { m = JSON.parse(dec.decode(buf)); } catch (e) { return; }
+      if (!m || typeof m !== 'object' || !m._id || seen.has(m._id)) return;
+      if (seen.size > 3000) seen.clear();
+      seen.add(m._id);
+      onMsg(topic, m);
+    });
+    return c;
+  });
+  return {
+    up: () => clients.some(c => c.connected),
+    pub(topic, msg, opts, only) {
+      const s = JSON.stringify(Object.assign({ _id: rid() }, msg));
+      for (const c of only ? [only] : clients) if (c.connected) c.publish(topic, s, opts || {});
+    },
+    wake() { for (const c of clients) if (!c.connected && !c.reconnecting) try { c.reconnect(); } catch (e) {} },
+    end() { for (const c of clients) try { c.end(true); } catch (e) {} }
+  };
+}
 
 let wakeLock = null;
 async function keepAwake() {
@@ -199,7 +232,7 @@ function title(size) {
 
 /* ---------- HOST (TV) ---------- */
 const Host = {
-  active: false, peer: null, code: null, ready: false,
+  active: false, net: null, code: null, ready: false,
   players: new Map(), phase: 'lobby',
   settings: Object.assign({ per: 2, secs: 20 }, store.get('ton-settings') || {}),
   rounds: [], ri: -1, roundStart: 0, dur: 20000, guesses: new Map(), timer: null, last: null,
@@ -212,31 +245,78 @@ const Host = {
     this.connect();
   },
 
+  // the room code is claimed with a retained message on <room>/room, which the broker clears if this tab goes away
   connect() {
     this.ready = false;
     this.render();
-    const peer = new Peer(PREFIX + this.code, { debug: 1 });
-    this.peer = peer;
-    peer.on('open', () => { this.ready = true; setStatus(null); this.render(true); });
-    peer.on('connection', conn => this.onConn(conn));
-    peer.on('disconnected', () => { if (!peer.destroyed) { setStatus('Reconnecting to game server…'); setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); } });
-    peer.on('error', err => {
-      if (err.type === 'unavailable-id') { peer.destroy(); this.code = newCode(); this.connect(); }
-      else if (err.type === 'peer-unavailable') { /* ignore */ }
-      else { console.warn(err); setStatus('Connection hiccup — retrying…'); }
+    clearTimeout(this.claimTimer); clearTimeout(this.downTimer); clearInterval(this.sweeper);
+    this.claimTimer = null;
+    const base = PREFIX + this.code, me = this.session = rid();
+    const claim = c => this.net.pub(base + '/room', { t: 'room', host: me, at: Date.now() }, { retain: true }, c);
+    this.conns = new Map(); this.seq = 0; this.dirty = new Set(); this.removed = new Set();
+    this.net = Net({
+      subs: [base + '/room', base + '/h'],
+      will: { topic: base + '/room', payload: '', retain: true, qos: 0 },
+      onConnect: c => {
+        if (this.ready) claim(c);
+        else if (!this.claimTimer) this.claimTimer = setTimeout(() => {
+          if (this.session !== me) return;
+          claim(); this.ready = true; setStatus(null); this.render(true);
+        }, 1500);
+      },
+      onStatus: () => {
+        clearTimeout(this.downTimer);
+        if (this.net && this.net.up()) { if (this.ready) setStatus(null); }
+        else this.downTimer = setTimeout(() => setStatus('Reconnecting to game server…'), 3000);
+      },
+      onMsg: (topic, m) => {
+        if (this.session !== me) return;
+        if (topic === base + '/room') {
+          // someone else already has this code: pick another
+          if (!this.ready && m.t === 'room' && m.host !== me && Date.now() - m.at < 12 * 3600e3) {
+            this.session = null; this.claimTimer = null; this.net.end(); this.code = newCode(); this.connect();
+          }
+        } else if (typeof m.from === 'string') this.onNet(m);
+      }
     });
+    this.sweeper = setInterval(() => { this.sweep(); this.beat(); }, 3000);
+  },
+
+  // one conn per phone, kept alive by its pings. A conn that went quiet only comes back through a join.
+  onNet(m) {
+    let conn = this.conns.get(m.from);
+    if (!conn) {
+      const topic = PREFIX + this.code + '/p/' + m.from;
+      conn = { id: m.from, open: true, seen: 0, sent: 0,
+        send: msg => this.net.pub(topic, Object.assign({ _h: this.session, _s: ++this.seq }, msg)),
+        close() { this.open = false; } };
+      this.conns.set(m.from, conn);
+    }
+    conn.seen = Date.now();
+    if (this.removed.has(conn.id)) { if (m.t === 'join') conn.send({ t: 'kicked' }); return; }
+    if (m.t === 'ping') return;
+    if (!conn.open) { if (m.t !== 'join') return; conn.open = true; }
+    if (m.t === 'sync') { const p = this.players.get(conn._pid); if (p && p.conn === conn) this.sendView(p); return; }
+    this.onMsg(conn, m);
+  },
+
+  sweep() {
+    const now = Date.now();
+    for (const conn of this.conns.values()) if (conn.open && now - conn.seen > 12000) { conn.open = false; this.onClose(conn); }
+  },
+
+  // tells each phone which update it should be on; a phone that's missing one asks for it, one not listed rejoins
+  beat() {
+    if (!this.ready) return;
+    const s = {};
+    for (const p of this.players.values()) if (this.online(p)) s[p.conn.id] = p.conn.sent;
+    this.net.pub(PREFIX + this.code + '/all', { t: 'beat', h: this.session, s });
   },
 
   list() { return [...this.players.values()]; },
   online(p) { return !!(p.conn && p.conn.open); },
   ranked() { return this.list().sort((a, b) => b.score - a.score); },
   rankOf(p) { const r = this.ranked(); return r.findIndex(x => x.score === p.score) + 1; },
-
-  onConn(conn) {
-    conn.on('data', msg => this.onMsg(conn, msg));
-    conn.on('close', () => this.onClose(conn));
-    conn.on('error', () => this.onClose(conn));
-  },
 
   onClose(conn) {
     const p = this.players.get(conn._pid);
@@ -250,6 +330,24 @@ const Host = {
 
   send(p, msg) { try { if (this.online(p)) p.conn.send(msg); } catch (e) {} },
   sendAll() { for (const p of this.players.values()) this.sendView(p); },
+
+  // the public brokers drop messages from anyone sending more than ~10 at once, so phone updates
+  // are batched into one message for the whole room
+  sendView(p) {
+    this.dirty.add(p.id);
+    if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), 120);
+  },
+
+  flush() {
+    this.flushTimer = null;
+    const v = {}, s = ++this.seq;
+    for (const id of this.dirty) {
+      const p = this.players.get(id);
+      if (p && this.online(p)) { v[p.conn.id] = this.viewFor(p); p.conn.sent = s; }
+    }
+    this.dirty.clear();
+    if (Object.keys(v).length) this.net.pub(PREFIX + this.code + '/all', { t: 'views', v, _h: this.session, _s: s });
+  },
 
   onMsg(conn, msg) {
     if (!msg || typeof msg !== 'object') return;
@@ -309,6 +407,7 @@ const Host = {
     const p = this.players.get(id);
     if (!p || !confirm(`Remove ${p.name} from the game?`)) return;
     this.send(p, { t: 'kicked' });
+    if (p.conn) this.removed.add(p.conn.id);
     this.players.delete(id);
     setTimeout(() => { try { p.conn && p.conn.close(); } catch (e) {} }, 300);
     this.render();
@@ -465,7 +564,7 @@ const Host = {
   },
 
   /* ---- what each phone sees ---- */
-  sendView(p) {
+  viewFor(p) {
     const base = { name: p.name, score: p.score };
     let v;
     if (this.phase === 'lobby') v = { phase: 'lobby', count: this.players.size };
@@ -483,7 +582,7 @@ const Host = {
       v = { phase: 'reveal', isAuthor: r.author === p.id, authorName: this.last.authorName, fooled: this.last.fooled,
             gain: this.last.gains.get(p.id) || 0, correct: g ? g.target === r.author : null, rank: this.rankOf(p) };
     } else if (this.phase === 'final') v = { phase: 'final', rank: this.rankOf(p), total: this.players.size };
-    this.send(p, Object.assign(base, v));
+    return Object.assign(base, v);
   },
 
   /* ---- TV rendering ---- */
@@ -617,14 +716,17 @@ const Host = {
 
 /* ---------- PLAYER (phone) ---------- */
 const Player = {
-  peer: null, conn: null, code: '', name: '', view: null, stopped: false, kicked: false,
-  retry: null, dialTimer: null, drafts: [],
+  net: null, conn: null, code: '', name: '', view: null, stopped: false, kicked: false,
+  id: null, heard: 0, upAt: 0, found: false, hostH: null, hostS: 0, pinger: null, dialTimer: null, drafts: [],
 
   start(code) {
+    // a stable id lets a refreshed phone pick up where it left off
+    this.id = store.get('ton-pid') || rid();
+    store.set('ton-pid', this.id);
     const saved = store.get('ton-player') || {};
     this.form(code || saved.code || '', saved.name || '');
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.view && !this.stopped && !(this.conn && this.conn.open)) this.open();
+      if (document.visibilityState === 'visible' && this.net && !this.stopped) { this.net.wake(); this.ping(); }
     });
   },
 
@@ -654,65 +756,65 @@ const Player = {
     this.name = String(name).replace(/\s+/g, ' ').trim().slice(0, 16);
     if (this.code.length !== 4 || !this.name) return this.form(this.code, this.name, 'Enter the 4-letter room code and your name.');
     store.set('ton-player', { code: this.code, name: this.name });
+    this.stop();
     this.stopped = false; this.kicked = false;
     this.message('⏳', 'Joining…');
     keepAwake();
     this.open();
   },
 
+  // the game counts as reachable while the host has answered in the last 12 seconds
   open() {
-    if (this.stopped) return;
-    if (!this.peer || this.peer.destroyed) {
-      const peer = new Peer({ debug: 1 });
-      this.peer = peer;
-      peer.on('open', () => this.dial());
-      peer.on('error', e => this.onErr(e));
-      peer.on('disconnected', () => { if (!peer.destroyed) setTimeout(() => { try { peer.reconnect(); } catch (e) {} }, 1500); });
-    } else if (this.peer.open) {
-      this.dial();
-    } else if (this.peer.disconnected) {
-      try { this.peer.reconnect(); } catch (e) {}
-    }
+    const base = PREFIX + this.code, t0 = Date.now();
+    this.heard = 0; this.upAt = 0; this.found = false;
+    this.conn = { get open() { return !!(Player.net && Player.net.up() && Date.now() - Player.heard < 12000); }, send: m => this.toHost(m) };
+    this.net = Net({
+      subs: [base + '/room', base + '/all', base + '/p/' + this.id],
+      onConnect: () => { if (!this.upAt) this.upAt = Date.now(); this.toHost({ t: 'join', name: this.name }); },
+      onMsg: (topic, m) => { if (topic === base + '/room') this.found = this.found || m.t === 'room'; else this.onHost(m); }
+    });
+    this.pinger = setInterval(() => this.ping(), 4000);
+    this.dialTimer = setInterval(() => {
+      if (this.view) return clearInterval(this.dialTimer);
+      const now = Date.now();
+      let err;
+      if (!this.upAt) { if (now - t0 > 10000) err = "Couldn't connect. Check your internet and try again."; }
+      else if (!this.found) { if (now - this.upAt > 4000) err = 'No game found with that code.'; }
+      else if (now - t0 > 15000) err = "Couldn't reach the game. Try again, or switch between Wi-Fi and cellular.";
+      if (err) { this.stop(); this.form(this.code, this.name, err); }
+    }, 500);
   },
 
-  dial() {
-    if (this.stopped) return;
-    try { this.conn && this.conn.close(); } catch (e) {}
-    const conn = this.peer.connect(PREFIX + this.code, { reliable: true, serialization: 'json' });
-    this.conn = conn;
-    clearTimeout(this.dialTimer);
-    this.dialTimer = setTimeout(() => {
-      if (conn.open || this.conn !== conn) return;
-      if (this.view) this.lost();
-      else { this.stop(); this.form(this.code, this.name, "Couldn't reach the game. Check the code, or try switching between Wi-Fi and cellular."); }
-    }, 15000);
-    conn.on('open', () => { clearTimeout(this.dialTimer); setStatus(null); conn.send({ t: 'join', name: this.name }); });
-    conn.on('data', m => this.onData(m));
-    conn.on('close', () => { if (this.conn === conn) this.lost(); });
-    conn.on('error', () => { if (this.conn === conn) this.lost(); });
+  toHost(m) { if (this.net) this.net.pub(PREFIX + this.code + '/h', Object.assign({ from: this.id }, m)); },
+
+  ping() {
+    if (!this.net || this.stopped) return;
+    this.toHost({ t: 'ping' });
+    if (this.view && Date.now() - this.heard > 12000) { setStatus('Reconnecting…'); this.net.wake(); }
+  },
+
+  onHost(m) {
+    this.heard = Date.now(); this.found = true;
+    if (this.view) setStatus(null);
+    if (m.t === 'beat') {
+      const s = m.s || {};
+      if (!(this.id in s)) this.toHost({ t: 'join', name: this.name });
+      else if (m.h !== this.hostH || s[this.id] > this.hostS) this.toHost({ t: 'sync' });
+      return;
+    }
+    // the same update can arrive through either broker, so skip anything older than what's on screen
+    if (m._h === this.hostH && m._s <= this.hostS) return;
+    const v = m.t === 'views' ? m.v && m.v[this.id] : m;
+    if (!v) return;
+    this.hostH = m._h; this.hostS = m._s;
+    this.onData(v);
   },
 
   stop() {
     this.stopped = true;
-    clearTimeout(this.retry); clearTimeout(this.dialTimer);
-    try { this.conn && this.conn.close(); } catch (e) {}
-    try { this.peer && this.peer.destroy(); } catch (e) {}
-    this.conn = null; this.peer = null;
-  },
-
-  lost() {
-    if (this.stopped || this.kicked) return;
-    setStatus('Reconnecting…');
-    clearTimeout(this.retry);
-    this.retry = setTimeout(() => { if (!(this.conn && this.conn.open)) this.open(); }, 2000);
-  },
-
-  onErr(e) {
-    if (this.stopped) return;
-    if (this.view) { this.lost(); return; }
-    this.stop();
-    if (e.type === 'peer-unavailable') this.form(this.code, this.name, 'No game found with that code.');
-    else this.form(this.code, this.name, "Couldn't connect. Check your internet and try again.");
+    clearInterval(this.pinger); clearInterval(this.dialTimer);
+    try { this.net && this.net.end(); } catch (e) {}
+    this.net = null; this.conn = null;
   },
 
   onData(m) {
@@ -856,7 +958,7 @@ function home() {
       </ul>
       <h3>Good to know</h3>
       <ul>
-        <li><b>The host screen is the game.</b> There's no server: phones connect straight to the host's browser. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
+        <li><b>The host screen is the game.</b> Phones send their answers to the host's browser, and it runs everything. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
         <li><b>Phones don't need the same Wi-Fi.</b> Mobile data works too.</li>
         <li><b>Dropped out?</b> Rejoin with the same name to keep your score.</li>
         <li><b>Game settings</b> on the host screen let you pick answers per player and seconds to guess.</li>
@@ -871,13 +973,13 @@ function home() {
   </div>
   <footer class="foot">Vibe coded by <a href="https://nikhilmath.com" target="_blank" rel="noopener">NikhilMath.com</a></footer>`;
   document.getElementById('host').onclick = () => {
-    if (!window.Peer) { setStatus("Couldn't load the game engine — check your internet."); return; }
+    if (!window.mqtt) { setStatus("Couldn't load the game engine — check your internet."); return; }
     Host.start();
   };
   document.getElementById('join').onclick = () => Player.start('');
 }
 
-if (!window.Peer) setStatus("Couldn't load the game engine — check your internet and refresh.");
+if (!window.mqtt) setStatus("Couldn't load the game engine — check your internet and refresh.");
 window.__game = { Host, Player };
 home();
 })();

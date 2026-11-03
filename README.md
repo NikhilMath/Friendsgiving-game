@@ -5,7 +5,7 @@ A Kahoot-style Friendsgiving party game. Everyone secretly answers prompts on th
 - **Host screen (TV/laptop):** shows the room code + QR code, the answers, a countdown, and the leaderboard.
 - **Phones:** everyone joins by scanning the QR code, then writes answers and taps their guesses.
 - **Scoring:** a correct guess earns 500–1,000 points (faster is more). The author earns 150 for every person they fool.
-- **No server, no accounts.** It's one static `index.html`. Phones connect peer-to-peer to the host screen using [PeerJS](https://peerjs.com/).
+- **No server of your own, no accounts.** It's one static `index.html`. Phones and the host screen exchange messages through free public MQTT brokers, so it works on cellular and any Wi-Fi.
 
 ## Play
 
@@ -34,5 +34,5 @@ It must be served over **https** for phones to join. Opening the file directly f
 ## Tech
 
 - Vanilla HTML/CSS/JS in a single file
-- [PeerJS](https://peerjs.com/) (WebRTC) for host ↔ phone messaging via the free public PeerJS broker
+- [MQTT.js](https://github.com/mqttjs/MQTT.js) over secure websockets for host ↔ phone messaging. Every message goes through both the HiveMQ and EMQX public brokers, so the game keeps working if one of them is down.
 - [qrcodejs](https://github.com/davidshimjs/qrcodejs) for the join QR code
