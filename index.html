@@ -62,6 +62,7 @@ label{display:block;text-align:left;font-weight:500;margin-bottom:6px}
 .card{background:var(--card);border-radius:20px;padding:22px;box-shadow:0 6px 0 rgba(0,0,0,.25)}
 .stack{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px}
 .err{color:var(--bad);font-weight:500}
+.left{color:var(--gold);font-variant-numeric:tabular-nums}
 .topbar{display:flex;justify-content:space-between;gap:12px;padding:14px 18px 0;color:var(--muted);
   font-size:clamp(1rem,1.8vw,1.3rem);font-weight:500}
 
@@ -456,6 +457,33 @@ const Host = {
     return `⏱️ ${lead}, the longest game will be about ${mins} min (${rounds} rounds)`;
   },
 
+  // longest the rest of the game can take, using the same timings as the lobby estimate: what's left of
+  // writing, the current round's timer and reveal, then every remaining round run to its full timer
+  timeLeft() {
+    const R = this.settings.secs + 15, now = Date.now();
+    if (this.phase === 'write') {
+      const per = Math.max(1, ...this.list().map(p => p.tasks.length));
+      const rounds = this.list().reduce((n, p) => n + p.tasks.length, 0);
+      return Math.max(0, 30 + per * 45 - (now - this.phaseStart) / 1000) + rounds * R + 30;
+    }
+    const after = Math.max(0, this.rounds.length - this.ri - 1) * R + 30;
+    if (this.phase === 'guess') return Math.max(0, this.dur - (now - this.roundStart)) / 1000 + 15 + after;
+    if (this.phase === 'reveal') return Math.max(0, 15 - (now - this.phaseStart) / 1000) + after;
+    return 0;
+  },
+
+  leftText() {
+    const t = Math.ceil(this.timeLeft());
+    return `⏱️ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')} left`;
+  },
+
+  leftHtml() { return `<span class="left" id="left" title="Longest the rest of the game can take">${this.leftText()}</span>`; },
+
+  startClock() {
+    clearInterval(this.clock);
+    this.clock = setInterval(() => { const el = document.getElementById('left'); if (el) el.textContent = this.leftText(); }, 1000);
+  },
+
   // in a shuffled circle, everyone describes the next `per` people after them, so nobody draws
   // themselves, nobody draws the same person twice, and everyone gets described the same number of times
   assignAll() {
@@ -491,6 +519,8 @@ const Host = {
     if (this.players.size < 3) return;
     this.readSettings();
     this.phase = 'write';
+    this.phaseStart = Date.now();
+    this.startClock();
     this.assignAll();
     this.render(true);
     this.sendAll();
@@ -597,6 +627,7 @@ const Host = {
     this.last = { gains, authorPts, right, authorName: author ? author.name : 'Someone who left',
       subjectName: subject ? subject.name : r.subjectName };
     this.phase = 'reveal';
+    this.phaseStart = Date.now();
     this.render(true);
     this.sendAll();
   },
@@ -604,6 +635,7 @@ const Host = {
   finish() {
     clearInterval(this.timer);
     this.phase = 'final';
+    clearInterval(this.clock);
     this.render(true);
     this.sendAll();
   },
@@ -612,6 +644,7 @@ const Host = {
     for (const p of this.players.values()) { p.score = 0; p.answers = null; p.tasks = []; }
     this.rounds = []; this.ri = -1; this.last = null;
     this.phase = 'lobby';
+    clearInterval(this.clock);
     this.render(true);
     this.sendAll();
   },
@@ -713,7 +746,7 @@ const Host = {
 
   vWrite() {
     const done = this.list().filter(p => p.answers).length;
-    $app.innerHTML = `<div class="topbar"><span>Room ${this.code}</span><span>${done} / ${this.players.size} done</span></div>
+    $app.innerHTML = `<div class="topbar"><span>Room ${this.code}</span>${this.leftHtml()}<span>${done} / ${this.players.size} done</span></div>
       <div class="screen">
         <div class="emoji">✍️</div>
         <h2>Describe your secret people<br>on your phone</h2>
@@ -727,7 +760,7 @@ const Host = {
   vGuess(full) {
     if (!full && document.getElementById('guess-root')) { this.updateGuessCount(); return; }
     const r = this.rounds[this.ri];
-    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span><span id="gc"></span></div>
+    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span>${this.leftHtml()}<span id="gc"></span></div>
       <div class="screen" id="guess-root">
         <div class="prompt-label">${esc(r.prompt)}</div>
         <div class="card answer">“${esc(r.answer)}”</div>
@@ -749,7 +782,7 @@ const Host = {
     const byText = `Written by ${esc(L.authorName)}${L.authorPts ? ` <span class="gain">+${fmt(L.authorPts)}</span>` : ''}`;
     const top = this.ranked().slice(0, 5).map((p, i) =>
       `<div class="row"><span>${i + 1}. ${esc(p.name)}</span><span class="pts">${fmt(p.score)}</span></div>`).join('');
-    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span><span>Room ${this.code}</span></div>
+    $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span>${this.leftHtml()}<span>Room ${this.code}</span></div>
       <div class="screen">
         <div class="prompt-label">“${esc(r.answer)}”</div>
         <div class="sub">is…</div>
