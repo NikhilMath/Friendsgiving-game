@@ -389,12 +389,16 @@ const Host = {
       if (this.everyoneWrote()) this.autoBegin();
     }
 
-    if (msg.t === 'swap' && this.phase === 'write' && !p.answers && !p.swapped) {
+    if (msg.t === 'swap' && this.phase === 'write' && !p.answers) {
       const i = msg.i | 0;
-      const fresh = DEFAULT_PROMPTS.filter(x => !p.prompts.includes(x));
-      if (i < 0 || i >= p.prompts.length || !fresh.length) return;
+      const open = DEFAULT_PROMPTS.filter(x => !p.prompts.includes(x));
+      if (i < 0 || i >= p.prompts.length || !open.length) return;
+      if (!p.seen) p.seen = new Set(p.prompts);
+      // prefer prompts this player hasn't seen yet; once they've cycled through all, start over
+      let fresh = open.filter(x => !p.seen.has(x));
+      if (!fresh.length) { p.seen = new Set(p.prompts); fresh = open; }
       p.prompts[i] = shuffle(fresh)[0];
-      p.swapped = true;
+      p.seen.add(p.prompts[i]);
       this.sendView(p);
     }
 
@@ -442,7 +446,7 @@ const Host = {
   assignPrompts(p) {
     p.prompts = shuffle(DEFAULT_PROMPTS).slice(0, this.settings.per);
     p.answers = null;
-    p.swapped = false;
+    p.seen = new Set(p.prompts);
   },
 
   startWriting() {
@@ -574,7 +578,7 @@ const Host = {
     const base = { name: p.name, score: p.score };
     let v;
     if (this.phase === 'lobby') v = { phase: 'lobby', count: this.players.size };
-    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers, canSwap: !p.swapped && DEFAULT_PROMPTS.length > p.prompts.length };
+    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers, canSwap: DEFAULT_PROMPTS.length > p.prompts.length };
     else if (this.phase === 'guess') {
       const r = this.rounds[this.ri];
       const g = this.guesses.get(p.id);
@@ -857,7 +861,7 @@ const Player = {
       }
       $app.innerHTML = this.bar() + `<div class="screen"><form class="stack" id="wf">
         <h2 style="font-size:1.6rem">Your secret prompts</h2>
-        <p class="sub small">Nobody will know it's you… until the reveal.${v.canSwap ? ' Don\'t like a prompt? You get one swap.' : ''}</p>
+        <p class="sub small">Nobody will know it's you… until the reveal.${v.canSwap ? ' Don\'t like a prompt? Swap it as many times as you want.' : ''}</p>
         ${v.prompts.map((p, i) => `<div class="stack" style="gap:0"><label for="a${i}">${esc(p)}</label>
           <textarea id="a${i}" maxlength="140" rows="3">${esc(this.drafts[i] || '')}</textarea>
           ${v.canSwap ? `<button class="btn ghost swap" type="button" data-i="${i}">🔀 Swap this prompt</button>` : ''}</div>`).join('')}
@@ -953,7 +957,7 @@ function home() {
       </ol>
       <h3>Playing</h3>
       <ol>
-        <li><b>Write:</b> each phone gets secret prompts. Answer them without letting anyone see. Don't like one? Each player gets one swap.</li>
+        <li><b>Write:</b> each phone gets secret prompts. Answer them without letting anyone see. Don't like one? Swap it as many times as you want.</li>
         <li><b>Guess:</b> answers show up on the big screen one at a time. Pick who you think wrote it on your phone.</li>
         <li><b>Reveal:</b> the author is revealed and points are added. Highest score at the end wins.</li>
       </ol>
