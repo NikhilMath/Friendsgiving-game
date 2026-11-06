@@ -330,6 +330,7 @@ const Host = {
   online(p) { return !!(p.conn && p.conn.open); },
   ranked() { return this.list().sort((a, b) => b.score - a.score); },
   rankOf(p) { const r = this.ranked(); return r.findIndex(x => x.score === p.score) + 1; },
+  winners() { const r = this.ranked(); return r.filter(p => p.score === r[0].score); },
 
   onClose(conn) {
     const p = this.players.get(conn._pid);
@@ -369,7 +370,7 @@ const Host = {
       if (!name) return;
       let p = this.list().find(x => x.name.toLowerCase() === name.toLowerCase());
       if (p && this.online(p) && p.conn !== conn) {
-        try { conn.send({ t: 'err', msg: 'That name is already taken — pick another.' }); } catch (e) {}
+        try { conn.send({ t: 'err', msg: "That name is already taken. Pick another, or if it's you on a new phone, wait 15 seconds and try again." }); } catch (e) {}
         return;
       }
       if (!p) {
@@ -403,8 +404,10 @@ const Host = {
       const open = DEFAULT_PROMPTS.filter(x => !held.includes(x));
       if (!open.length) return;
       if (!p.seen) p.seen = new Set(held);
-      // prefer prompts this player hasn't seen yet; once they've cycled through all, start over
-      let fresh = open.filter(x => !p.seen.has(x));
+      // prefer prompts this player hasn't seen and nobody else is using; once they've cycled through all, start over
+      const used = this.usedPrompts(p);
+      let fresh = open.filter(x => !p.seen.has(x) && !used.has(x));
+      if (!fresh.length) fresh = open.filter(x => !p.seen.has(x));
       if (!fresh.length) { p.seen = new Set(held); fresh = open; }
       p.tasks[i].prompt = shuffle(fresh)[0];
       p.seen.add(p.tasks[i].prompt);
@@ -470,8 +473,16 @@ const Host = {
     this.dealPrompts(p);
   },
 
+  // prompts other players are using right now, so the same prompt doesn't come up twice in a game
+  usedPrompts(p) {
+    const used = new Set();
+    for (const q of this.players.values()) if (q !== p) for (const t of q.tasks || []) if (t.prompt) used.add(t.prompt);
+    return used;
+  },
+
   dealPrompts(p) {
-    const deck = shuffle(DEFAULT_PROMPTS);
+    const used = this.usedPrompts(p);
+    const deck = shuffle(DEFAULT_PROMPTS).sort((a, b) => used.has(a) - used.has(b));
     p.tasks.forEach((t, i) => { t.prompt = deck[i % deck.length]; t.name = this.players.get(t.subject).name; });
     p.seen = new Set(p.tasks.map(t => t.prompt));
   },
@@ -506,16 +517,21 @@ const Host = {
       });
     }
     if (!rounds.length) return;
-    rounds = shuffle(rounds);
-    // avoid the same writer or the same person described twice in a row where possible
+    // avoid the same writer or the same person described twice in a row: build the order greedily
+    // from a few hundred random starts and keep the one with the fewest repeats
     const clash = (a, b) => !!a && !!b && (a.author === b.author || a.subject === b.subject);
-    for (let i = 1; i < rounds.length; i++) {
-      if (clash(rounds[i], rounds[i - 1])) {
-        const j = rounds.findIndex((r, k) => k > i && !clash(r, rounds[i - 1]) && !clash(r, rounds[i + 1]));
-        if (j > -1) [rounds[i], rounds[j]] = [rounds[j], rounds[i]];
+    let best = null, bestN = Infinity;
+    for (let t = 0; t < 200 && bestN; t++) {
+      const left = shuffle(rounds), out = [];
+      let n = 0;
+      while (left.length) {
+        let k = left.findIndex(r => !clash(r, out[out.length - 1]));
+        if (k < 0) { k = 0; n++; }
+        out.push(left.splice(k, 1)[0]);
       }
+      if (n < bestN) { best = out; bestN = n; }
     }
-    this.rounds = rounds;
+    this.rounds = best;
     this.ri = -1;
     this.nextRound();
   },
@@ -628,7 +644,7 @@ const Host = {
       v = { phase: 'reveal', isAuthor: r.author === p.id, isSubject: r.subject === p.id,
             authorName: this.last.authorName, subjectName: this.last.subjectName, knew: this.last.right.length,
             gain: this.last.gains.get(p.id) || 0, correct: g ? g.target === r.subject : null, rank: this.rankOf(p) };
-    } else if (this.phase === 'final') v = { phase: 'final', rank: this.rankOf(p), total: this.players.size };
+    } else if (this.phase === 'final') v = { phase: 'final', rank: this.rankOf(p), total: this.players.size, tied: this.winners().length > 1 };
     return Object.assign(base, v);
   },
 
@@ -747,13 +763,21 @@ const Host = {
     document.getElementById('next').onclick = () => this.nextRound();
   },
 
+  finalHeadline() {
+    if (!this.players.size) return 'Game over';
+    const w = this.winners().map(p => esc(p.name));
+    if (w.length === 1) return w[0] + ' wins Friendsgiving!';
+    if (w.length === this.players.size) return "It's a tie! Everyone wins Friendsgiving!";
+    return `It's a tie! ${w.slice(0, -1).join(', ')} and ${w[w.length - 1]} share the win!`;
+  },
+
   vFinal() {
     const r = this.ranked();
     const pod = (p, place) => p ? `<div class="pod p${place}"><div class="nm">${esc(p.name)}</div><div class="sc">${fmt(p.score)} pts</div><div class="blk">${place}</div></div>` : '';
     const rest = r.slice(3).map((p, i) => `<div class="row"><span>${i + 4}. ${esc(p.name)}</span><span class="pts">${fmt(p.score)}</span></div>`).join('');
     $app.innerHTML = `<div class="screen">
         <div class="emoji">🏆</div>
-        <h2>${r[0] ? esc(r[0].name) + ' wins Friendsgiving!' : 'Game over'}</h2>
+        <h2>${this.finalHeadline()}</h2>
         <div class="podium">${pod(r[1], 2)}${pod(r[0], 1)}${pod(r[2], 3)}</div>
         ${rest ? `<div class="board">${rest}</div>` : ''}
         <button class="btn big" id="again">Play again</button>
@@ -963,7 +987,7 @@ const Player = {
     else if (v.phase === 'final') {
       const medal = ['🥇', '🥈', '🥉'][v.rank - 1] || '🦃';
       $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">${medal}</div>
-        <h2>${v.rank === 1 ? 'You won Friendsgiving!' : `You finished ${ordinal(v.rank)}`}</h2>
+        <h2>${v.rank === 1 ? (v.tied ? 'You tied for first!' : 'You won Friendsgiving!') : `You finished ${ordinal(v.rank)}`}</h2>
         <p class="sub">${fmt(v.score)} points · ${v.total} players</p></div>`;
     }
   }
