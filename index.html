@@ -446,14 +446,14 @@ const Host = {
     const est = document.getElementById('est'); if (est) est.textContent = this.estimate();
   },
 
-  // rough game length for the players in the lobby (3 minimum): writing time, then each round's guess timer plus the reveal
+  // the longest the game can run for the players in the lobby (3 minimum): writing time, then every
+  // round running its full guess timer plus the reveal, rounded up to the minute
   estimate() {
-    const n = Math.max(this.players.size, 3), { per, secs } = this.settings;
+    const n = Math.max(this.players.size, 3), { secs } = this.settings, per = Math.min(this.settings.per, n - 1);
     const rounds = n * per;
-    const half = Math.max(2, Math.round((30 + per * 45 + rounds * (secs + 15) + 30) / 30));
-    const mins = (half >> 1) + (half % 2 ? '½' : '');
+    const mins = Math.ceil((30 + per * 45 + rounds * (secs + 15) + 30) / 60);
     const lead = this.players.size < 3 ? 'With 3 players (the minimum)' : `With ${n} players`;
-    return `⏱️ ${lead}: about ${mins} min · ${rounds} rounds`;
+    return `⏱️ ${lead}, the longest game will be about ${mins} min (${rounds} rounds)`;
   },
 
   // in a shuffled circle, everyone describes the next `per` people after them, so nobody draws
@@ -766,8 +766,8 @@ const Host = {
   finalHeadline() {
     if (!this.players.size) return 'Game over';
     const w = this.winners().map(p => esc(p.name));
-    if (w.length === 1) return w[0] + ' wins Friendsgiving!';
-    if (w.length === this.players.size) return "It's a tie! Everyone wins Friendsgiving!";
+    if (w.length === 1) return w[0] + ' wins the Friendsgiving Game!';
+    if (w.length === this.players.size) return "It's a tie! Everyone wins the Friendsgiving Game!";
     return `It's a tie! ${w.slice(0, -1).join(', ')} and ${w[w.length - 1]} share the win!`;
   },
 
@@ -987,7 +987,7 @@ const Player = {
     else if (v.phase === 'final') {
       const medal = ['🥇', '🥈', '🥉'][v.rank - 1] || '🦃';
       $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">${medal}</div>
-        <h2>${v.rank === 1 ? (v.tied ? 'You tied for first!' : 'You won Friendsgiving!') : `You finished ${ordinal(v.rank)}`}</h2>
+        <h2>${v.rank === 1 ? (v.tied ? 'You tied for first!' : 'You won the Friendsgiving Game!') : `You finished ${ordinal(v.rank)}`}</h2>
         <p class="sub">${fmt(v.score)} points · ${v.total} players</p></div>`;
     }
   }
