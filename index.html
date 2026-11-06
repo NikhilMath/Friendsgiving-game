@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Who Wrote That? · Friendsgiving</title>
-<meta name="description" content="Friendsgiving at James and Lindsey's: write secret answers, then guess who wrote what. Join on your phone.">
+<title>Who Is This? · Friendsgiving</title>
+<meta name="description" content="Friendsgiving at James and Lindsey's: secretly describe a friend, then guess who each description is about. Join on your phone.">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#24140d">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://friendsgiving-game.netlify.app/">
-<meta property="og:site_name" content="Who Wrote That?">
-<meta property="og:title" content="Who Wrote That? · Friendsgiving at James and Lindsey's">
-<meta property="og:description" content="Write secret answers, then guess who wrote what. Join on your phone.">
+<meta property="og:site_name" content="Who Is This?">
+<meta property="og:title" content="Who Is This? · Friendsgiving at James and Lindsey's">
+<meta property="og:description" content="Secretly describe a friend, then guess who each description is about. Join on your phone.">
 <meta property="og:image" content="https://friendsgiving-game.netlify.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Who Wrote That? Friendsgiving at James and Lindsey's">
+<meta property="og:image:alt" content="Who Is This? Friendsgiving at James and Lindsey's">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,6 +103,8 @@ button.chip:hover{border-color:var(--bad)}
 .choice .shape{opacity:.75;font-size:.85em}
 .k0{background:var(--c0)}.k1{background:var(--c1)}.k2{background:var(--c2)}.k3{background:var(--c3)}
 .quote{font-size:1.25rem;font-weight:500;line-height:1.3;overflow-wrap:anywhere}
+.about{text-align:left;color:var(--gold);font-size:1.15rem;margin-bottom:2px}
+.about b{font-weight:600}
 
 /* reveal + board */
 .reveal-name{font-size:clamp(3rem,9vw,7rem);font-weight:700;color:var(--gold);line-height:1;animation:pop .5s ease-out}
@@ -157,32 +159,35 @@ button.chip:hover{border-color:var(--bad)}
 
 /* ---------- shared helpers ---------- */
 const $app = document.getElementById('app');
-const PREFIX = 'whowrotethat/v2-k7q2m9x4/';
+const PREFIX = 'whoisthis/v3-k7q2m9x4/';
 const SHAPES = ['▲', '◆', '●', '■'];
+// prompts about the person you drew. They show on the TV without the name, so keep them about "them"
 const DEFAULT_PROMPTS = [
-  "Something I'm weirdly thankful for",
-  "A hidden talent most people here don't know about",
-  "A celebrity I've been told I look like",
-  "A skill I pretend to have",
-  "My go-to karaoke song",
-  "The strangest thing in my fridge right now",
-  "What I always try to bring to group hangs",
-  "My contribution to the group chat",
-  "First time I met James, it was when we ...",
-  "First time I met Lindsey, it was when we ...",
-  "One thing I like about the person on my right",
-  "My favorite takeout spot",
-  "A small thing that instantly makes my day better",
-  "The Thanksgiving dish I'd fight someone for",
-  "A food opinion I'll defend forever",
-  "Something I got way too into this year",
-  "The best thing I bought this year for under $50",
-  "A song I've played way too many times this year",
-  "The show I rewatch for comfort",
-  "A tiny luxury I refuse to give up",
-  "My signature move at a party",
-  "The topic I'll happily talk your ear off about",
-  "What I'd be famous for in another life"
+  "One thing I like about them",
+  "The first time I met them, we…",
+  "The first thing I noticed about them",
+  "Their hidden superpower",
+  "The emoji that sums them up",
+  "Their vibe, in three words",
+  "Who would play them in a movie",
+  "What they'd be famous for in another life",
+  "Their signature move at a party",
+  "The topic they could happily talk about for hours",
+  "Their go-to karaoke song",
+  "If they were a Thanksgiving dish, they'd be…",
+  "Their dream job if money didn't matter",
+  "Something they're secretly great at",
+  "The best advice they'd give",
+  "Why the group chat is better with them in it",
+  "What they always bring to group hangs",
+  "Something they get way too excited about",
+  "The most \"them\" thing they'd say",
+  "Why I'd want them on my team",
+  "Their perfect day off",
+  "Their go-to coffee or drink order",
+  "The fictional character they're most like",
+  "The Olympic event they'd win gold in",
+  "Why I'm thankful for them"
 ];
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -235,7 +240,7 @@ async function keepAwake() {
 }
 
 function title(size) {
-  return `<h1${size ? ` style="font-size:${size}"` : ''}>Who Wrote <span class="alt">That?</span></h1>`;
+  return `<h1${size ? ` style="font-size:${size}"` : ''}>Who Is <span class="alt">This?</span></h1>`;
 }
 
 /* ---------- HOST (TV) ---------- */
@@ -368,9 +373,9 @@ const Host = {
         return;
       }
       if (!p) {
-        p = { id: Math.random().toString(36).slice(2, 10), name, score: 0, conn, prompts: [], answers: null };
+        p = { id: Math.random().toString(36).slice(2, 10), name, score: 0, conn, tasks: [], answers: null };
         this.players.set(p.id, p);
-        if (this.phase === 'write') this.assignPrompts(p);
+        if (this.phase === 'write') this.assignLate(p);
       } else {
         p.conn = conn;
       }
@@ -385,7 +390,7 @@ const Host = {
 
     if (msg.t === 'answers' && this.phase === 'write' && !p.answers) {
       const arr = Array.isArray(msg.answers) ? msg.answers : [];
-      p.answers = p.prompts.map((_, i) => String(arr[i] || '').trim().slice(0, 140));
+      p.answers = p.tasks.map((_, i) => String(arr[i] || '').trim().slice(0, 140));
       this.render();
       this.sendView(p);
       if (this.everyoneWrote()) this.autoBegin();
@@ -393,21 +398,24 @@ const Host = {
 
     if (msg.t === 'swap' && this.phase === 'write' && !p.answers) {
       const i = msg.i | 0;
-      const open = DEFAULT_PROMPTS.filter(x => !p.prompts.includes(x));
-      if (i < 0 || i >= p.prompts.length || !open.length) return;
-      if (!p.seen) p.seen = new Set(p.prompts);
+      if (i < 0 || i >= p.tasks.length) return;
+      const held = p.tasks.map(t => t.prompt);
+      const open = DEFAULT_PROMPTS.filter(x => !held.includes(x));
+      if (!open.length) return;
+      if (!p.seen) p.seen = new Set(held);
       // prefer prompts this player hasn't seen yet; once they've cycled through all, start over
       let fresh = open.filter(x => !p.seen.has(x));
-      if (!fresh.length) { p.seen = new Set(p.prompts); fresh = open; }
-      p.prompts[i] = shuffle(fresh)[0];
-      p.seen.add(p.prompts[i]);
+      if (!fresh.length) { p.seen = new Set(held); fresh = open; }
+      p.tasks[i].prompt = shuffle(fresh)[0];
+      p.seen.add(p.tasks[i].prompt);
       this.sendView(p);
     }
 
+    // anyone except the writer can guess, including the person being described
     if (msg.t === 'guess' && this.phase === 'guess') {
       const r = this.rounds[this.ri];
       if (!r || p.id === r.author || this.guesses.has(p.id)) return;
-      if (!this.players.has(msg.target) || msg.target === p.id) return;
+      if (!this.players.has(msg.target)) return;
       this.guesses.set(p.id, { target: msg.target, ms: Date.now() - this.roundStart });
       this.sendView(p);
       this.updateGuessCount();
@@ -445,17 +453,34 @@ const Host = {
     return `⏱️ ${lead}: about ${mins} min · ${rounds} rounds`;
   },
 
-  assignPrompts(p) {
-    p.prompts = shuffle(DEFAULT_PROMPTS).slice(0, this.settings.per);
+  // in a shuffled circle, everyone describes the next `per` people after them, so nobody draws
+  // themselves, nobody draws the same person twice, and everyone gets described the same number of times
+  assignAll() {
+    const ps = shuffle(this.list()), n = ps.length, per = Math.min(this.settings.per, n - 1);
+    for (const p of ps) { p.tasks = []; p.answers = null; }
+    for (let k = 1; k <= per; k++) ps.forEach((p, i) => p.tasks.push({ subject: ps[(i + k) % n].id }));
+    for (const p of ps) this.dealPrompts(p);
+  },
+
+  // someone who joins mid-writing describes random others
+  assignLate(p) {
+    const others = shuffle(this.list().filter(x => x.id !== p.id)).slice(0, this.settings.per);
+    p.tasks = others.map(x => ({ subject: x.id }));
     p.answers = null;
-    p.seen = new Set(p.prompts);
+    this.dealPrompts(p);
+  },
+
+  dealPrompts(p) {
+    const deck = shuffle(DEFAULT_PROMPTS);
+    p.tasks.forEach((t, i) => { t.prompt = deck[i % deck.length]; t.name = this.players.get(t.subject).name; });
+    p.seen = new Set(p.tasks.map(t => t.prompt));
   },
 
   startWriting() {
     if (this.players.size < 3) return;
     this.readSettings();
     this.phase = 'write';
-    for (const p of this.players.values()) this.assignPrompts(p);
+    this.assignAll();
     this.render(true);
     this.sendAll();
   },
@@ -474,14 +499,19 @@ const Host = {
     if (this.phase !== 'write') return;
     let rounds = [];
     for (const p of this.players.values()) {
-      (p.answers || []).forEach((a, i) => { if (a) rounds.push({ author: p.id, prompt: p.prompts[i], answer: a }); });
+      (p.answers || []).forEach((a, i) => {
+        const t = p.tasks[i];
+        // skip descriptions of anyone who was removed, since nobody could pick them
+        if (a && t && this.players.has(t.subject)) rounds.push({ author: p.id, subject: t.subject, subjectName: t.name, prompt: t.prompt, answer: a });
+      });
     }
     if (!rounds.length) return;
     rounds = shuffle(rounds);
-    // avoid the same author twice in a row where possible
+    // avoid the same writer or the same person described twice in a row where possible
+    const clash = (a, b) => !!a && !!b && (a.author === b.author || a.subject === b.subject);
     for (let i = 1; i < rounds.length; i++) {
-      if (rounds[i].author === rounds[i - 1].author) {
-        const j = rounds.findIndex((r, k) => k > i && r.author !== rounds[i - 1].author && (!rounds[i + 1] || r.author !== rounds[i + 1].author));
+      if (clash(rounds[i], rounds[i - 1])) {
+        const j = rounds.findIndex((r, k) => k > i && !clash(r, rounds[i - 1]) && !clash(r, rounds[i + 1]));
         if (j > -1) [rounds[i], rounds[j]] = [rounds[j], rounds[i]];
       }
     }
@@ -534,20 +564,22 @@ const Host = {
     clearInterval(this.timer);
     const r = this.rounds[this.ri];
     const gains = new Map();
-    let fooled = 0;
     const right = [];
     for (const [pid, g] of this.guesses) {
       const p = this.players.get(pid); if (!p) continue;
-      if (g.target === r.author) {
+      if (g.target === r.subject) {
         const pts = Math.round(500 + 500 * Math.max(0, 1 - g.ms / this.dur));
         p.score += pts; gains.set(pid, pts); right.push({ name: p.name, pts });
-      } else { fooled++; gains.set(pid, 0); }
+      } else gains.set(pid, 0);
     }
+    // the writer scores for every right guess, so specific descriptions pay off
     const author = this.players.get(r.author);
-    const authorPts = fooled * 150;
+    const authorPts = right.length * 150;
     if (author) { author.score += authorPts; gains.set(author.id, authorPts); }
     right.sort((a, b) => b.pts - a.pts);
-    this.last = { gains, fooled, authorPts, right, authorName: author ? author.name : 'Someone who left' };
+    const subject = this.players.get(r.subject);
+    this.last = { gains, authorPts, right, authorName: author ? author.name : 'Someone who left',
+      subjectName: subject ? subject.name : r.subjectName };
     this.phase = 'reveal';
     this.render(true);
     this.sendAll();
@@ -561,7 +593,7 @@ const Host = {
   },
 
   playAgain() {
-    for (const p of this.players.values()) { p.score = 0; p.answers = null; p.prompts = []; }
+    for (const p of this.players.values()) { p.score = 0; p.answers = null; p.tasks = []; }
     this.rounds = []; this.ri = -1; this.last = null;
     this.phase = 'lobby';
     this.render(true);
@@ -580,19 +612,22 @@ const Host = {
     const base = { name: p.name, score: p.score };
     let v;
     if (this.phase === 'lobby') v = { phase: 'lobby', count: this.players.size };
-    else if (this.phase === 'write') v = { phase: 'write', prompts: p.prompts, done: !!p.answers, canSwap: DEFAULT_PROMPTS.length > p.prompts.length };
+    else if (this.phase === 'write') v = { phase: 'write', tasks: p.tasks.map(t => ({ name: t.name, prompt: t.prompt })),
+      done: !!p.answers, canSwap: DEFAULT_PROMPTS.length > p.tasks.length };
     else if (this.phase === 'guess') {
       const r = this.rounds[this.ri];
       const g = this.guesses.get(p.id);
+      // everyone is an option (the writer too), so the list never gives away who wrote it
       v = { phase: 'guess', n: this.ri + 1, total: this.rounds.length, prompt: r.prompt, answer: r.answer,
             isAuthor: r.author === p.id, picked: g ? g.target : null,
-            options: this.list().filter(x => x.id !== p.id).map(x => ({ id: x.id, name: x.name })) };
-      if (g) { const t = this.players.get(g.target); v.pickedName = t ? t.name : '?'; }
+            options: this.list().map(x => ({ id: x.id, name: x.name, me: x.id === p.id })) };
+      if (g) { const t = this.players.get(g.target); v.pickedName = t ? (t.id === p.id ? 'Me!' : t.name) : '?'; }
     } else if (this.phase === 'reveal') {
       const r = this.rounds[this.ri];
       const g = this.guesses.get(p.id);
-      v = { phase: 'reveal', isAuthor: r.author === p.id, authorName: this.last.authorName, fooled: this.last.fooled,
-            gain: this.last.gains.get(p.id) || 0, correct: g ? g.target === r.author : null, rank: this.rankOf(p) };
+      v = { phase: 'reveal', isAuthor: r.author === p.id, isSubject: r.subject === p.id,
+            authorName: this.last.authorName, subjectName: this.last.subjectName, knew: this.last.right.length,
+            gain: this.last.gains.get(p.id) || 0, correct: g ? g.target === r.subject : null, rank: this.rankOf(p) };
     } else if (this.phase === 'final') v = { phase: 'final', rank: this.rankOf(p), total: this.players.size };
     return Object.assign(base, v);
   },
@@ -638,7 +673,7 @@ const Host = {
       </div>
       <div class="stack" style="max-width:none;align-items:center">
         ${title('clamp(2.2rem,4.5vw,3.8rem)')}
-        <p class="sub">Write secret answers on your phone. Then guess who wrote what.<br>Fast right guesses score big. Fooling everyone scores too.</p>
+        <p class="sub">Your phone secretly gives you a friend to describe. Then guess who each description is about.<br>Fast right guesses score big. So do descriptions everyone gets.</p>
         <div class="sub" id="count">${countText}</div>
         <div class="chips" id="chips">${this.chips('lobby')}</div>
         <div class="sub small" id="est">${this.estimate()}</div>
@@ -646,7 +681,7 @@ const Host = {
           <summary>Game settings</summary>
           <p class="sub small" style="margin-top:6px">Game length changes with these and the number of players. The estimate above updates as you go.</p>
           <div class="grid">
-            <div><label for="set-per">Answers per player</label>
+            <div><label for="set-per">People each player describes</label>
               <select id="set-per">${[1,2,3].map(v => `<option ${v === s.per ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
             <div><label for="set-secs">Seconds to guess</label>
               <select id="set-secs">${[15,20,30].map(v => `<option ${v === s.secs ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -665,8 +700,8 @@ const Host = {
     $app.innerHTML = `<div class="topbar"><span>Room ${this.code}</span><span>${done} / ${this.players.size} done</span></div>
       <div class="screen">
         <div class="emoji">✍️</div>
-        <h2>Answer your secret prompts<br>on your phone</h2>
-        <p class="sub">Be honest… or be sneaky. Nobody finds out who wrote what until the reveal.</p>
+        <h2>Describe your secret people<br>on your phone</h2>
+        <p class="sub">No names! Make it specific enough that everyone can guess who it is.</p>
         <div class="chips">${this.chips('write')}</div>
         <button class="btn ghost" id="go" ${done ? '' : 'disabled'}>Start guessing now</button>
       </div>`;
@@ -680,7 +715,7 @@ const Host = {
       <div class="screen" id="guess-root">
         <div class="prompt-label">${esc(r.prompt)}</div>
         <div class="card answer">“${esc(r.answer)}”</div>
-        <h2 style="font-size:clamp(1.3rem,2.6vw,2rem)">Who wrote this?</h2>
+        <h2 style="font-size:clamp(1.3rem,2.6vw,2rem)">Who is this?</h2>
         <div class="tnum" id="tnum">${this.settings.secs}</div>
         <div class="timer"><i id="tbar" style="width:100%"></i></div>
         <button class="btn ghost" id="skip">Reveal now</button>
@@ -695,15 +730,16 @@ const Host = {
     const rightText = L.right.length
       ? `Got it: ${L.right.map(x => `${esc(x.name)} <span class="gain">+${fmt(x.pts)}</span>`).join(', ')}`
       : 'Nobody got it!';
-    const foolText = L.fooled ? ` · fooled ${L.fooled} <span class="gain">+${fmt(L.authorPts)}</span>` : '';
+    const byText = `Written by ${esc(L.authorName)}${L.authorPts ? ` <span class="gain">+${fmt(L.authorPts)}</span>` : ''}`;
     const top = this.ranked().slice(0, 5).map((p, i) =>
       `<div class="row"><span>${i + 1}. ${esc(p.name)}</span><span class="pts">${fmt(p.score)}</span></div>`).join('');
     $app.innerHTML = `<div class="topbar"><span>Round ${this.ri + 1} of ${this.rounds.length}</span><span>Room ${this.code}</span></div>
       <div class="screen">
         <div class="prompt-label">“${esc(r.answer)}”</div>
-        <div class="sub">was written by…</div>
-        <div class="reveal-name">${esc(L.authorName)}</div>
-        <div class="sub">${rightText}${foolText}</div>
+        <div class="sub">is…</div>
+        <div class="reveal-name">${esc(L.subjectName)}</div>
+        <div class="sub">${byText}</div>
+        <div class="sub">${rightText}</div>
         <div class="board">${top}</div>
         <button class="btn big" id="next">${lastRound ? 'Final results 🏆' : 'Next round →'}</button>
         <div class="sub small">or press Space</div>
@@ -838,7 +874,7 @@ const Player = {
     this.view = m;
     // don't wipe what someone is typing, or redraw an identical screen
     if (prev && prev.phase === m.phase) {
-      if (m.phase === 'write' && !prev.done && !m.done && prev.prompts.join('\n') === m.prompts.join('\n')) return;
+      if (m.phase === 'write' && !prev.done && !m.done && JSON.stringify(prev.tasks) === JSON.stringify(m.tasks)) return;
       if (m.phase === 'guess' && prev.n === m.n && prev.picked === m.picked && prev.isAuthor === m.isAuthor) return;
     }
     if (!prev || prev.phase !== 'write') this.drafts = [];
@@ -862,26 +898,29 @@ const Player = {
         return;
       }
       $app.innerHTML = this.bar() + `<div class="screen"><form class="stack" id="wf">
-        <h2 style="font-size:1.6rem">Your secret prompts</h2>
-        <p class="sub small">Nobody will know it's you… until the reveal.${v.canSwap ? ' Don\'t like a prompt? Swap it as many times as you want.' : ''}</p>
-        ${v.prompts.map((p, i) => `<div class="stack" style="gap:0"><label for="a${i}">${esc(p)}</label>
+        <h2 style="font-size:1.6rem">Your secret people</h2>
+        <p class="sub small">Describe each person without using their name. Make it specific so everyone can guess, and keep it kind.${v.canSwap ? ' Don\'t like a prompt? Swap it as many times as you want.' : ''}</p>
+        ${v.tasks.map((t, i) => `<div class="stack" style="gap:0"><div class="about">About <b>${esc(t.name)}</b></div>
+          <label for="a${i}">${esc(t.prompt)}</label>
           <textarea id="a${i}" maxlength="140" rows="3">${esc(this.drafts[i] || '')}</textarea>
           ${v.canSwap ? `<button class="btn ghost swap" type="button" data-i="${i}">🔀 Swap this prompt</button>` : ''}</div>`).join('')}
         <div class="err" id="werr"></div>
         <button class="btn big" type="submit">Lock in answers</button></form></div>`;
       const f = document.getElementById('wf');
-      f.addEventListener('input', () => { this.drafts = v.prompts.map((_, i) => document.getElementById('a' + i).value); });
+      f.addEventListener('input', () => { this.drafts = v.tasks.map((_, i) => document.getElementById('a' + i).value); });
       f.querySelectorAll('.swap').forEach(b => b.onclick = () => {
         if (!(this.conn && this.conn.open)) { document.getElementById('werr').textContent = 'Reconnecting… try again in a moment.'; return; }
         const i = +b.dataset.i;
-        this.drafts = v.prompts.map((_, j) => j === i ? '' : document.getElementById('a' + j).value);
+        this.drafts = v.tasks.map((_, j) => j === i ? '' : document.getElementById('a' + j).value);
         f.querySelectorAll('.swap').forEach(x => x.disabled = true);
         this.conn.send({ t: 'swap', i });
       });
       f.onsubmit = e => {
         e.preventDefault();
-        const answers = v.prompts.map((_, i) => document.getElementById('a' + i).value.trim());
+        const answers = v.tasks.map((_, i) => document.getElementById('a' + i).value.trim());
         if (answers.some(a => !a)) { document.getElementById('werr').textContent = 'Fill in every answer first.'; return; }
+        const named = v.tasks.find((t, i) => t.name.length > 1 && new RegExp('(^|[^a-z])' + t.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z])').test(answers[i].toLowerCase()));
+        if (named) { document.getElementById('werr').textContent = `Don't use ${named.name}'s name. That gives it away!`; return; }
         if (!(this.conn && this.conn.open)) { document.getElementById('werr').textContent = 'Reconnecting… try again in a moment.'; return; }
         this.conn.send({ t: 'answers', answers });
         f.querySelector('button').disabled = true;
@@ -889,18 +928,19 @@ const Player = {
     }
     else if (v.phase === 'guess') {
       if (v.isAuthor) {
-        $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🤫</div><h2>This one's yours!</h2>
-          <p class="sub">Keep a straight face. You score for everyone you fool.</p></div>`;
+        $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🤫</div><h2>You wrote this one!</h2>
+          <p class="sub">Keep a straight face. You score for everyone who guesses right.</p></div>`;
       } else if (v.picked) {
         $app.innerHTML = this.bar() + `<div class="screen"><div class="emoji">🔒</div><h2>Locked in: ${esc(v.pickedName)}</h2>
           <p class="sub">Waiting for the reveal…</p></div>`;
       } else {
         $app.innerHTML = this.bar() + `<div class="screen" style="justify-content:flex-start;gap:16px">
           <div class="sub small">Round ${v.n} of ${v.total}</div>
+          <div class="about" style="text-align:center;margin:0">${esc(v.prompt)}</div>
           <div class="card quote">“${esc(v.answer)}”</div>
-          <h2 style="font-size:1.5rem">Who wrote it?</h2>
+          <h2 style="font-size:1.5rem">Who is this?</h2>
           <div class="choices">${v.options.map((o, i) =>
-            `<button class="choice k${i % 4}" data-id="${o.id}"><span class="shape">${SHAPES[i % 4]}</span>${esc(o.name)}</button>`).join('')}</div></div>`;
+            `<button class="choice k${i % 4}" data-id="${o.id}"><span class="shape">${SHAPES[i % 4]}</span>${o.me ? 'Me!' : esc(o.name)}</button>`).join('')}</div></div>`;
         $app.querySelector('.choices').onclick = e => {
           const b = e.target.closest('[data-id]');
           if (!b || !(this.conn && this.conn.open)) return;
@@ -911,12 +951,13 @@ const Player = {
     }
     else if (v.phase === 'reveal') {
       let html;
-      if (v.isAuthor) html = v.fooled
-        ? `<div class="verdict ok">😈</div><h2>You fooled ${v.fooled}!</h2><div class="verdict gain">+${fmt(v.gain)}</div>`
-        : `<div class="verdict">😅</div><h2>Nobody fell for it</h2>`;
+      if (v.isAuthor) html = v.knew
+        ? `<div class="verdict ok">🎯</div><h2>${v.knew} ${v.knew === 1 ? 'person' : 'people'} knew it was ${esc(v.subjectName)}!</h2><div class="verdict gain">+${fmt(v.gain)}</div>`
+        : `<div class="verdict">😅</div><h2>Nobody guessed ${esc(v.subjectName)}</h2>`;
       else if (v.correct) html = `<div class="verdict ok">✓ Correct!</div><div class="verdict gain">+${fmt(v.gain)}</div>`;
-      else if (v.correct === false) html = `<div class="verdict no">✗ Nope</div><h2>It was ${esc(v.authorName)}</h2>`;
-      else html = `<div class="verdict no">⏰ Too slow</div><h2>It was ${esc(v.authorName)}</h2>`;
+      else if (v.correct === false) html = `<div class="verdict no">✗ Nope</div><h2>It was ${v.isSubject ? 'you' : esc(v.subjectName)}</h2>`;
+      else html = `<div class="verdict no">⏰ Too slow</div><h2>It was ${v.isSubject ? 'you' : esc(v.subjectName)}</h2>`;
+      if (v.isSubject) html += `<p class="sub">🥹 This one was about you, from ${esc(v.authorName)}</p>`;
       $app.innerHTML = this.bar() + `<div class="screen">${html}<p class="sub">You're in ${ordinal(v.rank)} place</p></div>`;
     }
     else if (v.phase === 'final') {
@@ -943,7 +984,7 @@ function home() {
     <div class="event">Friendsgiving at James and Lindsey's</div>
     <div class="emoji">🦃 🥧 🍂</div>
     ${title()}
-    <p class="sub">Everyone writes secret answers. Then everyone guesses who wrote what.</p>
+    <p class="sub">Everyone secretly describes a friend. Then everyone guesses who each one is about.</p>
     <div class="stack" style="max-width:360px">
       <button class="btn big" id="host">Host on this screen</button>
       <button class="btn ghost big" id="join">Join on my phone</button>
@@ -959,27 +1000,28 @@ function home() {
       </ol>
       <h3>Playing</h3>
       <ol>
-        <li><b>Write:</b> each phone gets secret prompts. Answer them without letting anyone see. Don't like one? Swap it as many times as you want.</li>
-        <li><b>Guess:</b> answers show up on the big screen one at a time. Pick who you think wrote it on your phone.</li>
-        <li><b>Reveal:</b> the author is revealed and points are added. Highest score at the end wins.</li>
+        <li><b>Describe:</b> each phone secretly draws other players' names, each with a prompt like "Their hidden superpower". Describe them without using their name. Don't like a prompt? Swap it as many times as you want.</li>
+        <li><b>Guess:</b> descriptions show up on the big screen one at a time. On your phone, pick who you think it's about. It might be you!</li>
+        <li><b>Reveal:</b> the person and the writer are revealed and points are added. Highest score at the end wins.</li>
       </ol>
       <h3>Scoring</h3>
       <ul>
         <li><b>Right guess:</b> 500–1,000 points. The faster you answer, the more you get.</li>
-        <li><b>Fooling people:</b> 150 points for each player who guesses wrong on your answer.</li>
+        <li><b>Good description:</b> 150 points for each player who guesses right on yours.</li>
       </ul>
       <h3>Good to know</h3>
       <ul>
         <li><b>The host screen is the game.</b> Phones send their answers to the host's browser, and it runs everything. Keep that tab open and the screen awake. Closing or refreshing it ends the game.</li>
         <li><b>Phones don't need the same Wi-Fi.</b> Mobile data works too.</li>
         <li><b>Dropped out?</b> Rejoin with the same name to keep your score.</li>
-        <li><b>Game settings</b> on the host screen let you pick answers per player and seconds to guess.</li>
+        <li><b>Everyone gets described.</b> Names are drawn so nobody gets themselves and everyone is described the same number of times.</li>
+        <li><b>Game settings</b> on the host screen let you pick how many people each player describes and seconds to guess.</li>
         <li>You need at least 3 players (not counting the host screen).</li>
       </ul>
     </details>
     <section class="prompts">
       <h3>The prompts</h3>
-      <p class="sub small">Each player gets a few of these at random.</p>
+      <p class="sub small">Each name you draw comes with one of these at random.</p>
       <ul>${DEFAULT_PROMPTS.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
     </section>
   </div>

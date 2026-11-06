@@ -1,10 +1,10 @@
-# Who Wrote That? 🦃
+# Who Is This? 🦃
 
-A Kahoot-style Friendsgiving party game. Everyone secretly answers prompts on their phone, then the group guesses who wrote each answer.
+A Kahoot-style Friendsgiving party game. Each phone secretly draws other players' names with a prompt like "Their hidden superpower". Everyone describes the people they drew, then the group guesses who each description is about.
 
-- **Host screen (TV/laptop):** shows the room code + QR code, the answers, a countdown, and the leaderboard.
-- **Phones:** everyone joins by scanning the QR code, then writes answers and taps their guesses.
-- **Scoring:** a correct guess earns 500–1,000 points (faster is more). The author earns 150 for every person they fool.
+- **Host screen (TV/laptop):** shows the room code + QR code, the descriptions, a countdown, and the leaderboard.
+- **Phones:** everyone joins by scanning the QR code, then describes the people they drew and taps their guesses.
+- **Scoring:** a correct guess earns 500–1,000 points (faster is more). The writer earns 150 for every person who guesses right, so specific descriptions pay off.
 - **No server of your own, no accounts.** It's one static `index.html`. Phones and the host screen exchange messages through free public MQTT brokers, so it works on cellular and any Wi-Fi.
 
 ## Play
@@ -13,7 +13,7 @@ A Kahoot-style Friendsgiving party game. Everyone secretly answers prompts on th
 2. Friends scan the QR code (or open the site and enter the 4-letter code).
 3. Press **Start game** once 3+ people are in. Space/Enter advances screens on the host.
 
-Settings in the lobby: answers per player (1–3) and seconds per guess.
+Settings in the lobby: people each player describes (1–3) and seconds per guess. Names are drawn so nobody gets themselves and everyone is described the same number of times.
 
 ## Deploy
 
@@ -29,7 +29,7 @@ It must be served over **https** for phones to join. Opening the file directly f
 - Keep the host tab open and don't refresh it, because refreshing ends the game.
 - If a phone locks, it reconnects automatically with the same name and score.
 - If someone can't connect on Wi-Fi, have them switch to cellular (or the reverse).
-- With about 10 people and 2 answers each, a game is about 20 rounds (~12–15 min).
+- With about 10 people describing 2 people each, a game is about 20 rounds (~12–15 min).
 
 ## Tech
 
